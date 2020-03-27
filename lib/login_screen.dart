@@ -1,3 +1,9 @@
+//This is stolen code from stack overflow, I now forget where I got it.
+//Thanks for the code though, whoever you are
+//Without you I wouldn't have gotten oauth working on flutter
+//Cause it sucks major dogshit right now
+//3/25/20
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_webview_plugin/flutter_webview_plugin.dart';

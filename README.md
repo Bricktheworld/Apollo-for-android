@@ -1,16 +1,9 @@
-# apollo
+Apollo
 
-A new Flutter project.
+This is an android adaptation of the well loved iOS reddit client 'Apollo'
 
-## Getting Started
+It is in beta right now, I might open source this project in the future, idk
 
-This project is a starting point for a Flutter application.
+This app is written in flutter and has some native code for the notification listener for the notifications
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
-
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Please contact me at brandon.shihabi@gmail.com.
