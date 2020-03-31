@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import './front_page_view.dart';
+import './pages/front_page_view.dart';
 import './hex_color.dart';
 import 'package:provider/provider.dart';
 import 'package:draw/draw.dart';
-import './home_view.dart';
+import './pages/home_view.dart';
 import './AuthModel.dart';
+import './pages/subreddit_list.dart';
 import 'package:cupertino_back_gesture/cupertino_back_gesture.dart';
 
 void main() => runApp(MyApp());
@@ -17,7 +18,7 @@ class MyApp extends StatelessWidget {
     return ChangeNotifierProvider<AuthModel>(
         create: (context) => AuthModel(),
         child: BackGestureWidthTheme(
-            backGestureWidth: BackGestureWidth.fraction(1),
+            backGestureWidth: BackGestureWidth.fraction(1 / 5),
             child: MaterialApp(
                 theme: ThemeData(
                     primaryColor: HexColor("1b202a"),
@@ -25,6 +26,7 @@ class MyApp extends StatelessWidget {
                     primaryColorDark: HexColor("1b202a"),
                     backgroundColor: HexColor("#2C3038"),
                     canvasColor: Colors.transparent,
+                    accentColor: HexColor('7b7f8a'),
                     // splashColor: HexColor(""),
                     splashFactory: InkRipple.splashFactory,
                     pageTransitionsTheme: PageTransitionsTheme(builders: {
@@ -33,6 +35,11 @@ class MyApp extends StatelessWidget {
                       TargetPlatform.iOS:
                           CupertinoPageTransitionsBuilderCustomBackGestureWidth(),
                     })),
-                home: new HomeView())));
+                // home: new HomeView(),
+                initialRoute: '/',
+                routes: {
+                  '/': (context) => HomeView(),
+                  '/postlist': (context) => FrontPageView(),
+                })));
   }
 }

@@ -32,6 +32,8 @@ dev_dependencies:
   flutter_webview_plugin: ^0.3.10+2
   provider: ^4.0.4
   cupertino_back_gesture: ^0.0.2
+  transparent_image: ^1.0.0
+  persistent_bottom_nav_bar: any
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

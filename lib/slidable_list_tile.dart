@@ -3,15 +3,23 @@ import 'package:draw/draw.dart';
 import './dismissible.dart';
 import 'dart:core';
 import './hex_color.dart';
+import 'package:http/http.dart';
+import 'package:transparent_image/transparent_image.dart';
 
 class SlidableListTile extends StatefulWidget {
   final Submission post;
   final Function clearVote;
   final Function upVote;
   final double numComments;
+  final Function onTap;
 
   const SlidableListTile(
-      {Key key, this.post, this.clearVote, this.upVote, this.numComments})
+      {Key key,
+      this.post,
+      this.clearVote,
+      this.upVote,
+      this.numComments,
+      this.onTap})
       : super(key: key);
 
   @override
@@ -20,6 +28,7 @@ class SlidableListTile extends StatefulWidget {
 
 class _SlidableListTileState extends State<SlidableListTile> {
   double offset = 0;
+  bool _pastThreshold = false;
 
   bool _toggleVote() {
     if (widget.post.vote == VoteState.upvoted) {
@@ -42,28 +51,38 @@ class _SlidableListTileState extends State<SlidableListTile> {
           padding: EdgeInsets.symmetric(horizontal: 20),
           alignment: AlignmentDirectional.center,
         ),
-        secondaryBackground: Container(
-            color: Theme.of(context).secondaryHeaderColor,
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            alignment: Alignment(1.2 + offset, 0),
-            // AlignmentDirectional.centerEnd,
-            child: Icon(
-              Icons.arrow_upward,
-              color: Colors.white,
-            )),
+        secondaryBackground: TweenAnimationBuilder(
+          builder: (_, double size, __) {
+            return Container(
+                color: offset.abs() < 0.4
+                    ? Theme.of(context).secondaryHeaderColor
+                    : HexColor('00AC37'),
+                padding: EdgeInsets.only(right: 20),
+                alignment: Alignment(1.2 + offset / 2, 0),
+                child: Icon(
+                  Icons.arrow_upward,
+                  color: Colors.white,
+                  size: size,
+                ));
+          },
+          tween: Tween<double>(begin: 20, end: _pastThreshold ? 40 : 20),
+          curve: Curves.elasticOut,
+          duration: Duration(seconds: 1),
+        ),
         dismissThresholds: {
-          DismissDirection.endToStart: 0.1,
+          DismissDirection.endToStart: 0.2,
           DismissDirection.startToEnd: 1,
         },
         onDismissed: (direction, extent) {
           double percentage = extent.abs() / MediaQuery.of(context).size.width;
           if (percentage < 0.4) {
             _toggleVote();
-          }
+          } else {}
         },
         onMove: (extent) {
           setState(() {
             offset = extent / MediaQuery.of(context).size.width;
+            _pastThreshold = offset.abs() > 0.2;
           });
         },
         movementDuration: Duration(milliseconds: 200),
@@ -75,18 +94,23 @@ class _SlidableListTileState extends State<SlidableListTile> {
               // elevation: 2,
               child: InkWell(
                   borderRadius: BorderRadius.circular(8),
-                  onTap: () {},
+                  onTap: () {
+                    if (widget.onTap != null) widget.onTap();
+                  },
                   child: Row(
                     children: <Widget>[
-                      widget.post.thumbnail == null
+                      (widget.post.thumbnail) == null
                           ? Icon(Icons.filter)
                           : Container(
                               alignment: Alignment.topCenter,
                               padding: EdgeInsets.all(10),
                               child: ClipRRect(
                                   borderRadius: BorderRadius.circular(5),
-                                  child: Image.network(
-                                      widget.post.thumbnail.toString(),
+                                  child: FadeInImage.memoryNetwork(
+                                      placeholder: kTransparentImage,
+                                      fadeInDuration:
+                                          Duration(milliseconds: 500),
+                                      image: widget.post.thumbnail.toString(),
                                       width: 80,
                                       height: 80,
                                       fit: BoxFit.fitHeight))),
@@ -112,18 +136,21 @@ class _SlidableListTileState extends State<SlidableListTile> {
                                         child: Text(
                                           widget.post.subreddit.displayName,
                                           style: TextStyle(
-                                              color: HexColor('7b7f8a'),
+                                              color:
+                                                  Theme.of(context).accentColor,
                                               fontSize: 11),
                                         )),
                                     Row(
                                       children: <Widget>[
                                         Text(widget.post.upvotes.toString(),
                                             style: TextStyle(
-                                                color: HexColor('7b7f8a'),
+                                                color: Theme.of(context)
+                                                    .accentColor,
                                                 fontSize: 11)),
                                         Text(widget.numComments.toString(),
                                             style: TextStyle(
-                                                color: HexColor('7b7f8a'),
+                                                color: Theme.of(context)
+                                                    .accentColor,
                                                 fontSize: 11)),
                                       ],
                                     )
