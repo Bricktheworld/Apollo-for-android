@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:draw/draw.dart';
 import './slidable_list_tile.dart';
 import './AuthModel.dart';
+import './post_view.dart';
 
 class SubredditPostView extends StatefulWidget {
   @required
@@ -27,38 +28,36 @@ class _SubredditPostViewState extends State<SubredditPostView> {
 
   listen() async {
     if (stream != null) stream.cancel();
-    if (widget.model.subStreams.containsKey(widget.sub)) {
-      _posts = widget.model.subStreams[widget.sub].posts;
+    if (widget.model.subStreams.containsKey(widget.sub.id)) {
+      _posts = widget.model.subStreams[widget.sub.id].posts;
     } else {
       _posts = <Submission>[];
       setState(() {});
     }
-    // await for (UserContent submission in widget.sub.hot()) {
-    //   Submission s = await (submission as Submission).populate();
-    //   _posts.add(s);
-    //   setState(() {});
-    //   debugPrint('new post: ' + s.title);
-    //   // print(s.body);
-    //   // print(s.selftext);
-    //   // print(s.url);
-    // }
-
-    stream = widget.sub.hot().listen((s) async {
-      if (!this.mounted) {
-        stream.cancel();
-        return;
-      }
-
+    //THIS ISN'T SLOW FOR SOME REASON?????????
+    stream = widget.sub.hot(limit: 90).listen((s) async {
       if (!_posts.contains(s)) {
-        Submission submission = await (s as Submission).populate();
-        _posts.add(submission);
-        if (_posts.length % 100 == 0 && this.mounted) setState(() {});
-        // if (_posts.length > 700) stream.pause();
+        _posts.add(s);
+
+        // if (_posts.length % 100 == 0) {
+        // stream.cancel();
+        if (this.mounted) {
+          setState(() {});
+        } else {
+          stream.cancel();
+          return;
+        }
+
+        // notifyListeners();
+        debugPrint(widget.sub.displayName +
+            " loaded " +
+            _posts.length.toString() +
+            " posts");
       }
+      // }
     });
   }
 
-  @override
   @override
   void initState() {
     super.initState();
@@ -76,21 +75,40 @@ class _SubredditPostViewState extends State<SubredditPostView> {
   _buildList() {
     return Scaffold(
       backgroundColor: Theme.of(context).backgroundColor,
-      body: ListView.builder(
-        shrinkWrap: false,
-        physics: BouncingScrollPhysics(),
-        itemCount: _posts.length,
-        itemBuilder: (BuildContext context, int index) {
-          Submission post = _posts[index];
-          return SlidableListTile(
-            post: post,
-            upVote: () => post.upvote(),
-            clearVote: () => post.clearVote(),
-            numComments: 0,
-            onTap: () {},
-          );
-        },
-      ),
+      body: RefreshIndicator(
+          onRefresh: () async {},
+          child: ListView.builder(
+            shrinkWrap: false,
+            physics: BouncingScrollPhysics(),
+            itemCount: _posts.length,
+            itemBuilder: (BuildContext context, int index) {
+              Submission post = _posts[index];
+              return SlidableListTile(
+                post: post,
+                upVote: () {
+                  try {
+                    post.upvote();
+                  } catch (e) {}
+                },
+                clearVote: () {
+                  try {
+                    post.clearVote();
+                  } catch (e) {}
+                },
+                // numComments: 0,
+                onTap: () {
+                  // debugPrint(post.toString());
+                  // debugPrint(post.data.toString());
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => PostView(
+                                submission: post,
+                              )));
+                },
+              );
+            },
+          )),
       floatingActionButton: Padding(
           padding: const EdgeInsets.only(bottom: 60),
           child: FloatingActionButton(

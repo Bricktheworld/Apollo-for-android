@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../custom_app_bar.dart';
+
 class AccountPageView extends StatefulWidget {
   AccountPageView({Key key}) : super(key: key);
 
@@ -13,6 +15,7 @@ class _AccountPageViewState extends State<AccountPageView> {
     return Container(
       child: Scaffold(
         backgroundColor: Theme.of(context).backgroundColor,
+        appBar: CustomAppBar(title: 'Account'),
       ),
     );
   }

@@ -10,16 +10,10 @@ class SlidableListTile extends StatefulWidget {
   final Submission post;
   final Function clearVote;
   final Function upVote;
-  final double numComments;
   final Function onTap;
 
   const SlidableListTile(
-      {Key key,
-      this.post,
-      this.clearVote,
-      this.upVote,
-      this.numComments,
-      this.onTap})
+      {Key key, this.post, this.clearVote, this.upVote, this.onTap})
       : super(key: key);
 
   @override
@@ -29,6 +23,17 @@ class SlidableListTile extends StatefulWidget {
 class _SlidableListTileState extends State<SlidableListTile> {
   double offset = 0;
   bool _pastThreshold = false;
+  String _numComments = "0";
+
+  @override
+  void initState() {
+    super.initState();
+    widget.post.refreshComments().whenComplete(() {
+      setState(() {
+        _numComments = widget.post.comments.length.toString();
+      });
+    });
+  }
 
   bool _toggleVote() {
     if (widget.post.vote == VoteState.upvoted) {
@@ -58,15 +63,15 @@ class _SlidableListTileState extends State<SlidableListTile> {
                     ? Theme.of(context).secondaryHeaderColor
                     : HexColor('00AC37'),
                 padding: EdgeInsets.only(right: 20),
-                alignment: Alignment(1.2 + offset / 2, 0),
+                alignment: Alignment((1.2 + offset / 2).clamp(1.0, 1.2), 0),
                 child: Icon(
                   Icons.arrow_upward,
                   color: Colors.white,
                   size: size,
                 ));
           },
-          tween: Tween<double>(begin: 20, end: _pastThreshold ? 40 : 20),
-          curve: Curves.elasticOut,
+          tween: Tween<double>(begin: 0, end: _pastThreshold ? 40 : 0),
+          curve: ElasticOutCurve(0.2),
           duration: Duration(seconds: 1),
         ),
         dismissThresholds: {
@@ -147,11 +152,17 @@ class _SlidableListTileState extends State<SlidableListTile> {
                                                 color: Theme.of(context)
                                                     .accentColor,
                                                 fontSize: 11)),
-                                        Text(widget.numComments.toString(),
+                                        Spacer(
+                                          flex: 1,
+                                        ),
+                                        Text(_numComments,
                                             style: TextStyle(
                                                 color: Theme.of(context)
                                                     .accentColor,
                                                 fontSize: 11)),
+                                        Spacer(
+                                          flex: 20,
+                                        ),
                                       ],
                                     )
                                   ])),

@@ -71,7 +71,7 @@ class _FrontPageViewState extends State<FrontPageView> {
             post: post,
             upVote: () => post.upvote(),
             clearVote: () => post.clearVote(),
-            numComments: 0,
+            // numComments: 0,
           );
         },
       ),

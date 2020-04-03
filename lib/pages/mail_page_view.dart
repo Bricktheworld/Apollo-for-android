@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../custom_app_bar.dart';
+
 class MailPageView extends StatefulWidget {
   MailPageView({Key key}) : super(key: key);
 
@@ -13,6 +15,7 @@ class _MailPageViewState extends State<MailPageView> {
     return Container(
       child: Scaffold(
         backgroundColor: Theme.of(context).backgroundColor,
+        appBar: CustomAppBar(title: 'Inbox'),
       ),
     );
   }

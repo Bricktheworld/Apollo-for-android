@@ -12,8 +12,9 @@ class AuthModel with ChangeNotifier {
   Reddit reddit;
   Redditor user;
   List<Submission> posts;
+  List<Subreddit> subs;
   Stream<UserContent> stream;
-  Map<Subreddit, SubPreload> subStreams = Map();
+  Map<String, SubPreload> subStreams = Map();
 
   void updateReddit(Reddit client) {
     reddit = client;
@@ -21,9 +22,13 @@ class AuthModel with ChangeNotifier {
   }
 
   login(BuildContext context, Function callback) async {
+    if (reddit != null && reddit.auth.isValid) {
+      debugPrint('already logged in');
+      _startFetching(callback);
+    }
     debugPrint('attempting to log in');
     final userAgent =
-        'android:com.bricktheworld.github.apollo:v0.0.2 (by /u/bricktheworld)';
+        'android:com.bricktheworld.github.apollo:v0.0.4 (by /u/bricktheworld)';
     final configUri = Uri.parse('draw.ini');
     final credentialsJson = await loadCredentials();
     if (credentialsJson == null) {
@@ -36,8 +41,8 @@ class AuthModel with ChangeNotifier {
       reddit = redditTemp;
       notifyListeners();
 
-      final authUrl = redditTemp.auth
-          .url(['*'], 'aslkdjflakwejfoiaehroijaewofire', compactLogin: true);
+      final authUrl =
+          redditTemp.auth.url(['*'], 'logging in', compactLogin: true);
       Navigator.push(
           context,
           MaterialPageRoute(
@@ -80,36 +85,58 @@ class AuthModel with ChangeNotifier {
     await prefs.setString('credentials', cred);
   }
 
-  preloadSubredditPosts(Subreddit data) async {
-    if (subStreams.containsKey(data)) return;
-    SubPreload subStream = new SubPreload();
-    subStream.stream = data.hot();
-    // await for (UserContent s in data.hot()) {
-    //   subStream.posts.add(s);
-    //   if (subStream.posts.length >= 100) {
-    //     // subStream.subscription.cancel();
+  beginPreloadPosts(List<Subreddit> data) {
+    subs = data;
+    preloadSubredditPosts(0);
+  }
 
-    //     notifyListeners();
-    //     debugPrint(data.displayName +
-    //         " preloaded " +
-    //         subStream.posts.length.toString() +
-    //         " posts");
-    //     return;
-    //   }
-    // }
-    subStream.subscription = subStream.stream.listen((s) {
-      subStream.posts.add(s);
-      if (subStream.posts.length >= 100) {
-        subStream.subscription.cancel();
+  preloadSubredditPosts(int index) async {
+    // if (subStreams.containsKey(data)) return;
+    int numCompleted = 0;
+    int numberOfSimultaneousStreams = 3;
+    for (int i = 0; i < 3; i++) {
+      if (index + i < subs.length) {
+        // debugPrint("loading " + subs[index + i].displayName);
+        SubPreload subStream = new SubPreload();
+        subStream.stream = subs[index + i].hot();
 
-        // notifyListeners();
-        debugPrint(data.displayName +
-            " preloaded " +
-            subStream.posts.length.toString() +
-            " posts");
+        subStream.subscription = subStream.stream.listen((s) {
+          Submission post = s;
+          // post.refreshComments();
+          subStream.posts.add(post);
+
+          if (subStream.posts.length >= 100) {
+            subStream.subscription.cancel();
+            subStreams[subs[index + i].id] = subStream;
+            // callback();
+            numCompleted++;
+
+            notifyListeners();
+            // debugPrint(subs[index + i].displayName +
+            //     " preloaded " +
+            //     subStream.posts.length.toString() +
+            //     " posts");
+            if (numCompleted >= numberOfSimultaneousStreams) {
+              if (numberOfSimultaneousStreams < 3) {
+                Future.delayed(const Duration(minutes: 5), () {
+                  preloadSubredditPosts(0);
+                });
+              } else {
+                preloadSubredditPosts(
+                  index + 3,
+                );
+              }
+            }
+            // if (index + 1 < subs.length) {
+            //   preloadSubredditPosts(index + 1);
+            // }
+
+          }
+        });
+      } else {
+        numberOfSimultaneousStreams--;
       }
-    });
-    subStreams[data] = subStream;
+    }
   }
 }
 

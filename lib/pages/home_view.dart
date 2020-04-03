@@ -76,8 +76,8 @@ class _HomeViewState extends State<HomeView>
       Consumer<AuthModel>(builder: (context, model, child) {
         return SubredditListView(
           model: model,
-          preloadSubredditPosts: (Subreddit data) {
-            model.preloadSubredditPosts(data);
+          preloadSubredditPosts: (List<Subreddit> subs) {
+            model.beginPreloadPosts(subs);
           },
         );
       }),

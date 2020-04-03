@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../custom_app_bar.dart';
+
 class SearchPageView extends StatefulWidget {
   SearchPageView({Key key}) : super(key: key);
 
@@ -10,10 +12,9 @@ class SearchPageView extends StatefulWidget {
 class _SearchPageViewState extends State<SearchPageView> {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: Scaffold(
-        backgroundColor: Theme.of(context).backgroundColor,
-      ),
+    return Scaffold(
+      backgroundColor: Theme.of(context).backgroundColor,
+      appBar: CustomAppBar(title: 'Search'),
     );
   }
 }

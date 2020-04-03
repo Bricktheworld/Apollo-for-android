@@ -25,18 +25,32 @@ class _SubredditListViewState extends State<SubredditListView> {
     widget.model.login(context, _fetchSubreddits);
   }
 
+  _preloadPosts(int index) {
+    widget.preloadSubredditPosts(subreddits[index], () {
+      debugPrint("finished " + subreddits[index].displayName + " loading");
+      if (index < subreddits.length) _preloadPosts(index + 1);
+    });
+  }
+
   _fetchSubreddits() async {
-    subreddits = <Subreddit>[];
+    setState(() {
+      subreddits = <Subreddit>[];
+    });
     debugPrint('fetching subreddits');
     Stream<Subreddit> stream = widget.model.reddit.user.subreddits();
     await for (Subreddit s in stream) {
       subreddits.add(s);
-      subreddits.sort((Subreddit a, Subreddit b) =>
-          a.displayName.toString()[0].compareTo(b.displayName.toString()[0]));
-      await widget.preloadSubredditPosts(s);
+      subreddits.sort((Subreddit a, Subreddit b) => a.displayName
+          .toString()
+          .toLowerCase()
+          .compareTo(b.displayName.toString().toLowerCase()));
       setState(() {});
       debugPrint(subreddits.length.toString());
     }
+
+    // debugPrint("preloading subs");
+    // widget.preloadSubredditPosts(subreddits);
+
     // .listen((Subreddit data) async {
     //   subreddits.add(data);
     //   subreddits.sort((Subreddit a, Subreddit b) =>
@@ -70,44 +84,48 @@ class _SubredditListViewState extends State<SubredditListView> {
               backgroundColor: Theme.of(context).secondaryHeaderColor,
             )),
         backgroundColor: Theme.of(context).backgroundColor,
-        body: ListView.builder(
-            physics: BouncingScrollPhysics(),
-            itemCount: subreddits.length,
-            itemBuilder: (BuildContext context, int index) {
-              Subreddit sub = subreddits[index];
-              Widget icon;
-              if (sub.iconImage.toString() != "") {
-                icon = Container(
-                    width: 30,
-                    child: ClipRRect(
-                        borderRadius: BorderRadius.circular(25.0),
-                        child: FadeInImage.memoryNetwork(
-                          image: sub.iconImage.toString(),
-                          placeholder: kTransparentImage,
-                        )));
-              } else {
-                icon = Icon(
-                  Icons.image,
-                  color: Theme.of(context).accentColor,
-                );
-              }
-              return Material(
-                  color: Theme.of(context).primaryColor,
-                  child: InkWell(
-                      onTap: () {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => SubredditPostView(
-                                    model: widget.model, sub: sub)));
-                      },
-                      child: ListTile(
-                        leading: icon,
-                        title: Text(sub.displayName,
-                            style: TextStyle(color: Colors.white)),
-                        trailing: Icon(Icons.arrow_forward_ios,
-                            color: Theme.of(context).accentColor),
-                      )));
-            }));
+        body: RefreshIndicator(
+            onRefresh: () async {
+              await _fetchSubreddits();
+            },
+            child: ListView.builder(
+                // physics: BouncingScrollPhysics(),
+                itemCount: subreddits.length,
+                itemBuilder: (BuildContext context, int index) {
+                  Subreddit sub = subreddits[index];
+                  Widget icon;
+                  if (sub.iconImage.toString() != "") {
+                    icon = Container(
+                        width: 30,
+                        child: ClipRRect(
+                            borderRadius: BorderRadius.circular(25.0),
+                            child: FadeInImage.memoryNetwork(
+                              image: sub.iconImage.toString(),
+                              placeholder: kTransparentImage,
+                            )));
+                  } else {
+                    icon = Icon(
+                      Icons.image,
+                      color: Theme.of(context).accentColor,
+                    );
+                  }
+                  return Material(
+                      color: Theme.of(context).primaryColor,
+                      child: InkWell(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => SubredditPostView(
+                                        model: widget.model, sub: sub)));
+                          },
+                          child: ListTile(
+                            leading: icon,
+                            title: Text(sub.displayName,
+                                style: TextStyle(color: Colors.white)),
+                            trailing: Icon(Icons.arrow_forward_ios,
+                                color: Theme.of(context).accentColor),
+                          )));
+                })));
   }
 }
