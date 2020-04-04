@@ -29,9 +29,10 @@ class _SlidableListTileState extends State<SlidableListTile> {
   void initState() {
     super.initState();
     widget.post.refreshComments().whenComplete(() {
-      setState(() {
-        _numComments = widget.post.comments.length.toString();
-      });
+      if (this.mounted)
+        setState(() {
+          _numComments = widget.post.comments.length.toString();
+        });
     });
   }
 

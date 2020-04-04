@@ -98,14 +98,14 @@ class AuthModel with ChangeNotifier {
       if (index + i < subs.length) {
         // debugPrint("loading " + subs[index + i].displayName);
         SubPreload subStream = new SubPreload();
-        subStream.stream = subs[index + i].hot();
+        subStream.stream = subs[index + i].hot(limit: 25);
 
         subStream.subscription = subStream.stream.listen((s) {
           Submission post = s;
           // post.refreshComments();
           subStream.posts.add(post);
 
-          if (subStream.posts.length >= 100) {
+          if (subStream.posts.length >= 25) {
             subStream.subscription.cancel();
             subStreams[subs[index + i].id] = subStream;
             // callback();
@@ -117,14 +117,12 @@ class AuthModel with ChangeNotifier {
             //     subStream.posts.length.toString() +
             //     " posts");
             if (numCompleted >= numberOfSimultaneousStreams) {
-              if (numberOfSimultaneousStreams < 3) {
-                Future.delayed(const Duration(minutes: 5), () {
-                  preloadSubredditPosts(0);
-                });
-              } else {
+              if (numberOfSimultaneousStreams == 3) {
                 preloadSubredditPosts(
                   index + 3,
                 );
+              } else {
+                debugPrint("finished loading");
               }
             }
             // if (index + 1 < subs.length) {

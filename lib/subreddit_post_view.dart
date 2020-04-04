@@ -25,6 +25,7 @@ class _SubredditPostViewState extends State<SubredditPostView> {
   Redditor currentUser;
   StreamSubscription<UserContent> stream;
   var _postsTemp = <Submission>[];
+  bool _alreadyLoading = true;
 
   listen() async {
     if (stream != null) stream.cancel();
@@ -34,27 +35,30 @@ class _SubredditPostViewState extends State<SubredditPostView> {
       _posts = <Submission>[];
       setState(() {});
     }
-    //THIS ISN'T SLOW FOR SOME REASON?????????
-    stream = widget.sub.hot(limit: 90).listen((s) async {
+
+    _loadPosts();
+    // THIS ISN'T SLOW FOR SOME REASON?????????
+  }
+
+  _loadPosts() {
+    int i = 0;
+    String after;
+    if (_posts.length > 1) {
+      after = _posts.last.fullname;
+    } else {
+      after = null;
+    }
+    stream = widget.sub.hot(limit: 25, after: after).listen((s) async {
       if (!_posts.contains(s)) {
+        i++;
         _posts.add(s);
 
-        // if (_posts.length % 100 == 0) {
-        // stream.cancel();
-        if (this.mounted) {
-          setState(() {});
-        } else {
+        if (i >= 25) {
+          if (this.mounted) setState(() {});
+          _alreadyLoading = false;
           stream.cancel();
-          return;
         }
-
-        // notifyListeners();
-        debugPrint(widget.sub.displayName +
-            " loaded " +
-            _posts.length.toString() +
-            " posts");
       }
-      // }
     });
   }
 
@@ -82,6 +86,11 @@ class _SubredditPostViewState extends State<SubredditPostView> {
             physics: BouncingScrollPhysics(),
             itemCount: _posts.length,
             itemBuilder: (BuildContext context, int index) {
+              if (index > _posts.length - 10 && !_alreadyLoading) {
+                _alreadyLoading = true;
+                debugPrint("loading more: " + _posts.length.toString());
+                _loadPosts();
+              }
               Submission post = _posts[index];
               return SlidableListTile(
                 post: post,
