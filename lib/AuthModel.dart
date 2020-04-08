@@ -91,31 +91,23 @@ class AuthModel with ChangeNotifier {
   }
 
   preloadSubredditPosts(int index) async {
-    // if (subStreams.containsKey(data)) return;
     int numCompleted = 0;
     int numberOfSimultaneousStreams = 3;
     for (int i = 0; i < 3; i++) {
       if (index + i < subs.length) {
-        // debugPrint("loading " + subs[index + i].displayName);
         SubPreload subStream = new SubPreload();
-        subStream.stream = subs[index + i].hot(limit: 25);
+        subStream.stream = subs[index + i].hot(limit: 10);
 
         subStream.subscription = subStream.stream.listen((s) {
           Submission post = s;
-          // post.refreshComments();
           subStream.posts.add(post);
 
-          if (subStream.posts.length >= 25) {
+          if (subStream.posts.length >= 10) {
             subStream.subscription.cancel();
             subStreams[subs[index + i].id] = subStream;
-            // callback();
             numCompleted++;
 
             notifyListeners();
-            // debugPrint(subs[index + i].displayName +
-            //     " preloaded " +
-            //     subStream.posts.length.toString() +
-            //     " posts");
             if (numCompleted >= numberOfSimultaneousStreams) {
               if (numberOfSimultaneousStreams == 3) {
                 preloadSubredditPosts(
@@ -125,10 +117,6 @@ class AuthModel with ChangeNotifier {
                 debugPrint("finished loading");
               }
             }
-            // if (index + 1 < subs.length) {
-            //   preloadSubredditPosts(index + 1);
-            // }
-
           }
         });
       } else {

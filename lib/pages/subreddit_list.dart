@@ -48,8 +48,8 @@ class _SubredditListViewState extends State<SubredditListView> {
       debugPrint(subreddits.length.toString());
     }
 
-    // debugPrint("preloading subs");
-    // widget.preloadSubredditPosts(subreddits);
+    debugPrint("preloading subs");
+    widget.preloadSubredditPosts(subreddits);
 
     // .listen((Subreddit data) async {
     //   subreddits.add(data);

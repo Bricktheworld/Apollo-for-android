@@ -48,6 +48,7 @@ class _SubredditPostViewState extends State<SubredditPostView> {
     } else {
       after = null;
     }
+    if (stream != null) stream.cancel();
     stream = widget.sub.hot(limit: 25, after: after).listen((s) async {
       if (!_posts.contains(s)) {
         i++;
@@ -80,57 +81,64 @@ class _SubredditPostViewState extends State<SubredditPostView> {
     return Scaffold(
       backgroundColor: Theme.of(context).backgroundColor,
       body: RefreshIndicator(
-          onRefresh: () async {},
-          child: ListView.builder(
-            shrinkWrap: false,
-            physics: BouncingScrollPhysics(),
-            itemCount: _posts.length,
-            itemBuilder: (BuildContext context, int index) {
-              if (index > _posts.length - 10 && !_alreadyLoading) {
-                _alreadyLoading = true;
-                debugPrint("loading more: " + _posts.length.toString());
-                _loadPosts();
-              }
-              Submission post = _posts[index];
-              return SlidableListTile(
-                post: post,
-                upVote: () {
-                  try {
-                    post.upvote();
-                  } catch (e) {}
-                },
-                clearVote: () {
-                  try {
-                    post.clearVote();
-                  } catch (e) {}
-                },
-                // numComments: 0,
-                onTap: () {
-                  // debugPrint(post.toString());
-                  // debugPrint(post.data.toString());
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => PostView(
-                                submission: post,
-                              )));
-                },
-              );
-            },
-          )),
+        onRefresh: () async {},
+        child: ListView.builder(
+          shrinkWrap: false,
+          physics: BouncingScrollPhysics(),
+          itemCount: _posts.length,
+          itemBuilder: (BuildContext context, int index) {
+            if (index > _posts.length - 10 && !_alreadyLoading) {
+              _alreadyLoading = true;
+              debugPrint("loading more: " + _posts.length.toString());
+              _loadPosts();
+            }
+            Submission post = _posts[index];
+            return SlidableListTile(
+              post: post,
+              upVote: () {
+                try {
+                  post.upvote();
+                } catch (e) {}
+              },
+              clearVote: () {
+                try {
+                  post.clearVote();
+                } catch (e) {}
+              },
+              onTap: () {
+                // debugPrint(post.toString());
+                // debugPrint(post.data.toString());
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PostView(
+                      submission: post,
+                      comments: post.comments,
+                      numComments: post.numComments,
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
       floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 60),
-          child: FloatingActionButton(
-            onPressed: () async {
-              if (widget.model.reddit != null) {
-                listen();
-              } else {
-                widget.model.login(context, listen);
-              }
-            },
-            child: Icon(Icons.refresh),
-            backgroundColor: Theme.of(context).secondaryHeaderColor,
-          )),
+        padding: const EdgeInsets.only(bottom: 60),
+        child: FloatingActionButton(
+          onPressed: () async {
+            if (widget.model.reddit != null) {
+              _posts = <Submission>[];
+              setState(() {});
+              _loadPosts();
+            } else {
+              widget.model.login(context, listen);
+            }
+          },
+          child: Icon(Icons.refresh),
+          backgroundColor: Theme.of(context).secondaryHeaderColor,
+        ),
+      ),
     );
   }
 }
