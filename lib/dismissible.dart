@@ -17,7 +17,7 @@ const Curve _kResizeTimeCurve = Interval(0.4, 1.0, curve: Curves.ease);
 const double _kMinFlingVelocity = 700.0;
 const double _kMinFlingVelocityDelta = 400.0;
 const double _kFlingVelocityScale = -1.0 / 600.0;
-const double _kDismissThreshold = 0.4;
+const double _kDismissThreshold = 0.1;
 
 /// Signature used by [DismissibleCustom] to indicate that it has been dismissed in
 /// the given `direction`.

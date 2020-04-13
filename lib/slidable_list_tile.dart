@@ -67,9 +67,9 @@ class _SlidableListTileState extends State<SlidableListTile> {
     }
   }
 
-  Color _getCurrentPullColor() {
-    if (_pastThreshold) {
-      if (offset.abs() > 0.4) {
+  Color _getCurrentPullColor(bool threshold, currentOffset) {
+    if (threshold) {
+      if (currentOffset.abs() > 0.3) {
         return HexColor('#00AC37');
       } else {
         return Theme.of(context).secondaryHeaderColor;
@@ -81,7 +81,7 @@ class _SlidableListTileState extends State<SlidableListTile> {
 
   IconData _getCurrentIcon() {
     if (_pastThreshold) {
-      if (offset.abs() > 0.4) {
+      if (offset.abs() > 0.3) {
         return Icons.bookmark;
       } else {
         return Icons.arrow_upward;
@@ -100,9 +100,10 @@ class _SlidableListTileState extends State<SlidableListTile> {
         alignment: AlignmentDirectional.center,
       ),
       secondaryBackground: Container(
-        color: _getCurrentPullColor(),
+        color: _getCurrentPullColor(_pastThreshold, offset),
         padding: EdgeInsets.only(right: 20),
-        alignment: Alignment((1.2 + offset * 2), 0),
+        // alignment: Alignment((1.2 + offset * 2), 0),
+        alignment: AlignmentDirectional.centerEnd,
         child: Icon(
           _getCurrentIcon(),
           color: Colors.white,
@@ -122,10 +123,13 @@ class _SlidableListTileState extends State<SlidableListTile> {
         }
       },
       onMove: (extent) {
-        setState(() {
-          offset = extent / MediaQuery.of(context).size.width;
-          _pastThreshold = offset.abs() > 0.2;
-        });
+        var beforePullColor = _getCurrentPullColor(_pastThreshold, offset);
+        offset = extent / MediaQuery.of(context).size.width;
+        _pastThreshold = offset.abs() > 0.1;
+        if (beforePullColor != _getCurrentPullColor(_pastThreshold, offset)) {
+          debugPrint("update past threshold");
+          setState(() {});
+        }
       },
       movementDuration: Duration(milliseconds: 400),
       key: Key(widget.post.id),

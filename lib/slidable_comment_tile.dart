@@ -36,6 +36,7 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
   bool _upvoted = false;
   bool _isReplying = false;
   TextEditingController _controller;
+  Markdown.ExtensionSet _extensionSet;
 
   @override
   bool get wantKeepAlive => true;
@@ -69,9 +70,9 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
     }
   }
 
-  Color _getCurrentPullColor() {
-    if (_pastThreshold) {
-      if (offset.abs() > 0.3) {
+  Color _getCurrentPullColor(bool threshold, currentOffset) {
+    if (threshold) {
+      if (currentOffset.abs() > 0.3) {
         return HexColor('#23B5FF');
       } else {
         return Theme.of(context).secondaryHeaderColor;
@@ -95,6 +96,11 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
 
   Widget _mainComment() {
     String fixedBlockquote = widget.comment.body.replaceAll('&gt;', '>');
+    _extensionSet = Markdown.ExtensionSet(
+      <Markdown.BlockSyntax>[],
+      <Markdown.InlineSyntax>[],
+    );
+
     return DismissibleCustom(
       background: Container(
         color: Theme.of(context).backgroundColor,
@@ -102,9 +108,10 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
         alignment: AlignmentDirectional.center,
       ),
       secondaryBackground: Container(
-        color: _getCurrentPullColor(),
+        color: _getCurrentPullColor(_pastThreshold, offset),
         padding: EdgeInsets.only(right: 20),
-        alignment: Alignment((1.2 + offset * 2), 0),
+        // alignment: Alignment((1.2 + offset * 2), 0),
+        alignment: AlignmentDirectional.centerEnd,
         child: Icon(
           _getCurrentIcon(),
           color: Colors.white,
@@ -142,19 +149,13 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
         }
       },
       onMove: (extent) {
-        setState(() {
-          offset = extent / MediaQuery.of(context).size.width;
-          _pastThreshold = offset.abs() > 0.1;
-          // if (_pastThreshold) {
-          //   setState(() {
-          //     currentColor = ;
-          //   });
-          // } else {
-          //   setState(() {
-          //     currentColor = Theme.of(context).backgroundColor;
-          //   });
-          // }
-        });
+        var beforePullColor = _getCurrentPullColor(_pastThreshold, offset);
+        offset = extent / MediaQuery.of(context).size.width;
+        _pastThreshold = offset.abs() > 0.1;
+        if (beforePullColor != _getCurrentPullColor(_pastThreshold, offset)) {
+          debugPrint("update past threshold");
+          setState(() {});
+        }
       },
       movementDuration: Duration(milliseconds: 400),
       key: Key(widget.comment.id),
@@ -226,7 +227,7 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
                         extensionSet: Markdown.ExtensionSet.gitHubWeb,
                         inlineSyntaxes: [
                           Markdown.CodeSyntax(),
-                          Markdown.AutolinkExtensionSyntax()
+                          Markdown.AutolinkExtensionSyntax(),
                         ],
                         blockSyntaxes: [
                           Markdown.BlockquoteSyntax(),

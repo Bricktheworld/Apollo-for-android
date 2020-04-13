@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:apollo/AuthModel.dart';
+import 'package:apollo/popup_image_view.dart';
 import 'package:flutter/material.dart';
 import 'package:draw/draw.dart';
 import 'package:video_player/video_player.dart';
@@ -52,7 +54,8 @@ class _PostViewState extends State<PostView> {
   List commentThreads = [];
   bool _upvoted = false;
   double offset = 0;
-  bool _pastThreshold = false;
+  bool _showingPopupImage = false;
+  var _mediaForPopupView;
   var _mediaLink;
   String _body = "";
   PostType _postType = PostType.loading;
@@ -114,50 +117,70 @@ class _PostViewState extends State<PostView> {
       expandedHeight: _expandedHeight,
       floating: false,
       flexibleSpace: FlexibleSpaceBar(
-        background: Column(
+        background: Stack(
+          alignment: Alignment.bottomCenter,
           children: <Widget>[
-            ClipRRect(
-              child: FutureBuilder(
-                future: _initializeVideoPlayerFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.done) {
-                    _controller.play();
-                    _controller.setLooping(true);
-                    debugPrint(_controller.value.size.height.toString());
-                    // If the VideoPlayerController has finished initialization, use
-                    // the data it provides to limit the aspect ratio of the VideoPlayer.
-                    return ConstrainedBox(
-                      constraints: BoxConstraints(
-                          maxHeight:
-                              MediaQuery.of(context).size.height * 4 / 5),
-                      child: AspectRatio(
-                        aspectRatio: _controller.value.aspectRatio,
+            Column(
+              children: <Widget>[
+                ClipRRect(
+                  child: FutureBuilder(
+                    future: _initializeVideoPlayerFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.done) {
+                        _controller.play();
+                        _controller.setLooping(true);
+                        _mediaForPopupView = AspectRatio(
+                          aspectRatio: _controller.value.aspectRatio,
 
-                        // Use the VideoPlayer widget to display the video.
-                        child: Stack(
-                          alignment: Alignment.bottomCenter,
-                          children: <Widget>[
-                            VideoPlayer(_controller),
-                          ],
-                        ),
-                      ),
-                    );
-                  } else {
-                    // If the VideoPlayerController is still initializing, show a
-                    // loading spinner.
-                    return Center(
-                      child: SizedBox(
-                        height: 3,
-                        width: MediaQuery.of(context).size.width,
-                        child: LinearProgressIndicator(
-                          backgroundColor: Theme.of(context).accentColor,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.blue),
-                        ),
-                      ),
-                    );
-                  }
-                },
+                          // Use the VideoPlayer widget to display the video.
+                          child: VideoPlayer(_controller),
+                        );
+                        debugPrint(_controller.value.size.height.toString());
+                        // If the VideoPlayerController has finished initialization, use
+                        // the data it provides to limit the aspect ratio of the VideoPlayer.
+                        return ConstrainedBox(
+                          constraints: BoxConstraints(
+                              maxHeight:
+                                  MediaQuery.of(context).size.height * 4 / 5),
+                          child: AspectRatio(
+                            aspectRatio: _controller.value.aspectRatio,
+
+                            // Use the VideoPlayer widget to display the video.
+                            child: VideoPlayer(_controller),
+                          ),
+                        );
+                      } else {
+                        // If the VideoPlayerController is still initializing, show a
+                        // loading spinner.
+                        return Center(
+                          child: SizedBox(
+                            height: 3,
+                            width: MediaQuery.of(context).size.width,
+                            child: LinearProgressIndicator(
+                              backgroundColor: Theme.of(context).accentColor,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.blue),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            Positioned.fill(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _showingPopupImage = true;
+                      _controller.pause();
+                    });
+                    return true;
+                  },
+                ),
               ),
             ),
           ],
@@ -235,6 +258,7 @@ class _PostViewState extends State<PostView> {
         .addListener(new ImageStreamListener((ImageInfo info, bool _) {
       if (!this.mounted) return;
       setState(() {
+        _mediaForPopupView = image;
         _expandedHeight = (info.image.height *
                 MediaQuery.of(context).size.width /
                 info.image.width)
@@ -248,8 +272,26 @@ class _PostViewState extends State<PostView> {
       expandedHeight: _expandedHeight,
       floating: false,
       flexibleSpace: FlexibleSpaceBar(
-        background: image,
+        background: Stack(
+          children: <Widget>[
+            image,
+            Positioned.fill(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _showingPopupImage = true;
+                    });
+                    return true;
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
+      // ),
     );
   }
 
@@ -607,9 +649,23 @@ class _PostViewState extends State<PostView> {
       // appBar: CustomAppBar(title: widget.submission.title),
       backgroundColor: Theme.of(context).backgroundColor,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: BouncingScrollPhysics(),
-          slivers: _buildSlivers(),
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: <Widget>[
+            CustomScrollView(
+              physics: BouncingScrollPhysics(),
+              slivers: _buildSlivers(),
+            ),
+            PopupImageView(
+              isShown: _showingPopupImage,
+              media: _mediaForPopupView,
+              onDismiss: () {
+                setState(() {
+                  _showingPopupImage = false;
+                });
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -718,7 +774,9 @@ class _PostViewState extends State<PostView> {
         _postType = PostType.album;
       }
     } else {
-      String id = _mediaLink.substring(_mediaLink.indexOf("imgur.com") + 9);
+      debugPrint(_mediaLink);
+      String id = _mediaLink.substring(
+          _mediaLink.indexOf("imgur.com/") + 10, _mediaLink.length - 4);
       url = "https://api.imgur.com/3/image/" + id;
       debugPrint(url);
       var response = await http.get(url, headers: {
