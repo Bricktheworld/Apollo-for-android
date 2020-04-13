@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:draw/draw.dart';
-import 'package:markdown/markdown.dart' as Markdown;
+// import 'package:markdown/markdown.dart' as Markdown;
+import 'package:markd/markdown.dart' as Markdown;
 import 'package:flutter_html/flutter_html.dart';
 import './pages/popup_web_view.dart';
 import './dismissible.dart';
@@ -10,9 +11,6 @@ import './expandable.dart';
 
 class SlidableCommentTile extends StatefulWidget {
   final Comment comment;
-  // final AuthModel model;
-  final Function clearVote;
-  final Function upVote;
   final Function onTap;
   final int depth;
   final List<Widget> children;
@@ -20,9 +18,6 @@ class SlidableCommentTile extends StatefulWidget {
   SlidableCommentTile({
     Key key,
     this.comment,
-    // this.model,
-    this.clearVote,
-    this.upVote,
     this.onTap,
     this.depth,
     this.children,
@@ -39,6 +34,8 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
   Color currentColor;
   bool _isCollapsed = false;
   bool _upvoted = false;
+  bool _isReplying = false;
+  TextEditingController _controller;
 
   @override
   bool get wantKeepAlive => true;
@@ -46,7 +43,10 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
   @override
   void initState() {
     super.initState();
-    _upvoted = widget.comment.vote == VoteState.upvoted;
+    setState(() {
+      _upvoted = widget.comment.vote == VoteState.upvoted;
+    });
+    _controller = TextEditingController();
   }
 
   _toggleVote() {
@@ -55,13 +55,17 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
     });
     if (widget.comment.vote == VoteState.upvoted) {
       try {
-        widget.clearVote();
+        widget.comment.clearVote();
         // _posts[index].clearVote();
-      } catch (e) {}
+      } catch (e) {
+        debugPrint(e.toString());
+      }
     } else {
       try {
-        widget.upVote();
-      } catch (e) {}
+        widget.comment.upvote();
+      } catch (e) {
+        debugPrint(e.toString());
+      }
     }
   }
 
@@ -90,6 +94,7 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
   }
 
   Widget _mainComment() {
+    String fixedBlockquote = widget.comment.body.replaceAll('&gt;', '>');
     return DismissibleCustom(
       background: Container(
         color: Theme.of(context).backgroundColor,
@@ -114,7 +119,27 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
         double percentage = extent.abs() / MediaQuery.of(context).size.width;
         if (percentage < 0.3) {
           _toggleVote();
-        } else {}
+        } else {
+          setState(() {
+            _isReplying = !_isReplying;
+            if (!_isReplying) {
+              FocusScope.of(context).unfocus();
+            }
+          });
+          debugPrint(widget.comment.body);
+          String fixedBlockquote = widget.comment.body.replaceAll('&gt;', '>');
+
+          debugPrint(Markdown.markdownToHtml(fixedBlockquote,
+              extensionSet: Markdown.ExtensionSet.gitHubWeb,
+              inlineSyntaxes: [
+                Markdown.CodeSyntax(),
+                Markdown.AutolinkExtensionSyntax()
+              ],
+              blockSyntaxes: [
+                Markdown.BlockquoteSyntax(),
+                Markdown.CodeBlockSyntax(),
+              ]));
+        }
       },
       onMove: (extent) {
         setState(() {
@@ -131,19 +156,9 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
           // }
         });
       },
-      movementDuration: Duration(milliseconds: 900),
+      movementDuration: Duration(milliseconds: 400),
       key: Key(widget.comment.id),
       child: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: Theme.of(context).accentColor.withOpacity(0.001),
-              width: 1.5,
-            ),
-            // color: Theme.of(context).accentColor,
-            // width: 1,
-          ),
-        ),
         padding: EdgeInsets.all(0),
         //main container for most of the comment
         child: Container(
@@ -152,6 +167,7 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
             //adds the padding based on how far in the comment tree it is
             left: (widget.depth * 7).toDouble(),
           ),
+
           alignment: Alignment(-1, 0),
           //container for the main body of the comment
           child: Container(
@@ -205,7 +221,18 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
                         : CrossFadeState.showSecond,
                     firstChild: Container(),
                     secondChild: Html(
-                      data: Markdown.markdownToHtml(widget.comment.body),
+                      data: Markdown.markdownToHtml(
+                        fixedBlockquote,
+                        extensionSet: Markdown.ExtensionSet.gitHubWeb,
+                        inlineSyntaxes: [
+                          Markdown.CodeSyntax(),
+                          Markdown.AutolinkExtensionSyntax()
+                        ],
+                        blockSyntaxes: [
+                          Markdown.BlockquoteSyntax(),
+                          Markdown.CodeBlockSyntax(),
+                        ],
+                      ),
                       defaultTextStyle: TextStyle(
                         color: _isCollapsed
                             ? Theme.of(context).accentColor
@@ -235,11 +262,16 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
             ),
             decoration: BoxDecoration(
               border: Border(
-                  left: BorderSide(
-                //if the comment is the main comment, then we dont need a border...
-                width: widget.depth > 0 ? 1.5 : 0,
-                color: Theme.of(context).accentColor.withOpacity(0.5),
-              )),
+                left: BorderSide(
+                  //if the comment is the main comment, then we dont need a border...
+                  width: widget.depth > 0 ? 1.5 : 0,
+                  color: Theme.of(context).accentColor.withOpacity(0.5),
+                ),
+                bottom: BorderSide(
+                  width: 1,
+                  color: Theme.of(context).accentColor.withOpacity(0.1),
+                ),
+              ),
             ),
           ),
         ),
@@ -250,8 +282,118 @@ class _SlidableCommentTileState extends State<SlidableCommentTile>
   List<Widget> _buildTree() {
     List<Widget> tree = <Widget>[];
     // tree.add(_mainComment());
+    tree.add(_buildReplyMenu());
     tree.addAll(widget.children);
     return tree;
+  }
+
+  Widget _buildReplyMenu() {
+    return AnimatedCrossFade(
+      firstChild: Container(),
+      secondChild: Material(
+        color: Theme.of(context).primaryColor,
+        child: Material(
+          child: Container(
+            padding: EdgeInsets.only(
+              left: ((widget.depth + 1) * 7).toDouble(),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(
+                    //if the comment is the main comment, then we dont need a border...
+                    width: 1.5,
+                    color: Theme.of(context).accentColor.withOpacity(0.5),
+                  ),
+                  bottom: BorderSide(
+                    width: 1,
+                    color: Theme.of(context).accentColor.withOpacity(0.1),
+                  ),
+                ),
+              ),
+              child: Card(
+                color: HexColor("232a38"),
+                child: Column(
+                  children: <Widget>[
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            width: 1,
+                            color:
+                                Theme.of(context).accentColor.withOpacity(0.1),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: <Widget>[
+                          IconButton(
+                            onPressed: () {
+                              FocusScope.of(context).unfocus();
+                              setState(() {
+                                _isReplying = false;
+                              });
+                            },
+                            icon: Icon(
+                              Icons.close,
+                              color: Theme.of(context).accentColor,
+                              size: 15,
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () {
+                              widget.comment
+                                  .reply(_controller.value.text)
+                                  .whenComplete(() {
+                                _controller.value = TextEditingValue(text: "");
+                                FocusScope.of(context).unfocus();
+                                setState(() {
+                                  _isReplying = false;
+                                });
+                              }).catchError((e) {
+                                debugPrint(e.toString());
+                              });
+                            },
+                            icon: Icon(
+                              Icons.send,
+                              color: Theme.of(context).accentColor,
+                              size: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.all(10),
+                      child: TextField(
+                        controller: _controller,
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
+                        keyboardType: TextInputType.multiline,
+                        maxLines: null,
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          // border: OutlineInputBorder(),
+                          hintText: 'Type a reply...',
+                          hintStyle: TextStyle(
+                            color: Theme.of(context).accentColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      crossFadeState:
+          _isReplying ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+      duration: Duration(milliseconds: 100),
+    );
   }
 
   @override

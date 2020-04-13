@@ -31,7 +31,7 @@ class _SlidableListTileState extends State<SlidableListTile> {
     upvoted = widget.post.vote == VoteState.upvoted;
   }
 
-  bool _toggleVote() {
+  _toggleVote() {
     if (widget.post.vote == VoteState.upvoted) {
       try {
         widget.clearVote();
@@ -47,6 +47,23 @@ class _SlidableListTileState extends State<SlidableListTile> {
           upvoted = true;
         });
       } catch (e) {}
+    }
+  }
+
+  _toggleSave() async {
+    await widget.post.refresh();
+    if (widget.post.saved) {
+      try {
+        widget.post.unsave();
+      } catch (e) {
+        debugPrint(e.toString());
+      }
+    } else {
+      try {
+        widget.post.save();
+      } catch (e) {
+        debugPrint(e.toString());
+      }
     }
   }
 
@@ -96,10 +113,12 @@ class _SlidableListTileState extends State<SlidableListTile> {
         DismissDirection.endToStart: 0.2,
         DismissDirection.startToEnd: 1,
       },
-      onDismissed: (direction, extent) {
+      onDismissed: (direction, extent) async {
         double percentage = extent.abs() / MediaQuery.of(context).size.width;
         if (percentage < 0.4) {
           _toggleVote();
+        } else {
+          await _toggleSave();
         }
       },
       onMove: (extent) {
@@ -108,7 +127,7 @@ class _SlidableListTileState extends State<SlidableListTile> {
           _pastThreshold = offset.abs() > 0.2;
         });
       },
-      movementDuration: Duration(milliseconds: 200),
+      movementDuration: Duration(milliseconds: 400),
       key: Key(widget.post.id),
       child: Container(
         padding: EdgeInsets.all(0),

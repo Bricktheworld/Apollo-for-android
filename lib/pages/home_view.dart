@@ -1,6 +1,8 @@
 import 'dart:ui';
+import 'dart:convert';
 
 import 'package:apollo/hex_color.dart';
+import 'package:apollo/post_view.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -85,10 +87,12 @@ class _HomeViewState extends State<HomeView>
         return MailPageView();
       }),
       Consumer<AuthModel>(builder: (context, model, child) {
-        return AccountPageView();
+        return AccountPageView(model: model);
       }),
       Consumer<AuthModel>(builder: (context, model, child) {
-        return SearchPageView();
+        return SearchPageView(
+          model: model,
+        );
       }),
       Consumer<AuthModel>(builder: (context, model, child) {
         return SettingsPageView();

@@ -74,58 +74,66 @@ class _SubredditListViewState extends State<SubredditListView> {
 
   _buildList() {
     return Scaffold(
-        floatingActionButton: Padding(
-            padding: const EdgeInsets.only(bottom: 60),
-            child: FloatingActionButton(
-              onPressed: () async {
-                _fetchSubreddits();
-              },
-              child: Icon(Icons.refresh),
-              backgroundColor: Theme.of(context).secondaryHeaderColor,
-            )),
-        backgroundColor: Theme.of(context).backgroundColor,
-        body: RefreshIndicator(
-            onRefresh: () async {
-              await _fetchSubreddits();
+      floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 60),
+          child: FloatingActionButton(
+            onPressed: () async {
+              _fetchSubreddits();
             },
-            child: ListView.builder(
-                // physics: BouncingScrollPhysics(),
-                itemCount: subreddits.length,
-                itemBuilder: (BuildContext context, int index) {
-                  Subreddit sub = subreddits[index];
-                  Widget icon;
-                  if (sub.iconImage.toString() != "") {
-                    icon = Container(
-                        width: 30,
-                        child: ClipRRect(
-                            borderRadius: BorderRadius.circular(25.0),
-                            child: FadeInImage.memoryNetwork(
-                              image: sub.iconImage.toString(),
-                              placeholder: kTransparentImage,
-                            )));
-                  } else {
-                    icon = Icon(
-                      Icons.image,
-                      color: Theme.of(context).accentColor,
-                    );
-                  }
-                  return Material(
-                      color: Theme.of(context).primaryColor,
-                      child: InkWell(
-                          onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => SubredditPostView(
-                                        model: widget.model, sub: sub)));
-                          },
-                          child: ListTile(
-                            leading: icon,
-                            title: Text(sub.displayName,
-                                style: TextStyle(color: Colors.white)),
-                            trailing: Icon(Icons.arrow_forward_ios,
-                                color: Theme.of(context).accentColor),
-                          )));
-                })));
+            child: Icon(Icons.refresh),
+            backgroundColor: Theme.of(context).secondaryHeaderColor,
+          )),
+      backgroundColor: Theme.of(context).backgroundColor,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _fetchSubreddits();
+        },
+        child: ListView.builder(
+          physics: BouncingScrollPhysics(),
+          itemCount: subreddits.length + 1,
+          itemBuilder: (BuildContext context, int index) {
+            if (index >= subreddits.length) {
+              return Container(
+                height: 100,
+              );
+            }
+            Subreddit sub = subreddits[index];
+            Widget icon;
+            if (sub.iconImage.toString() != "") {
+              icon = Container(
+                  width: 30,
+                  child: ClipRRect(
+                      borderRadius: BorderRadius.circular(25.0),
+                      child: FadeInImage.memoryNetwork(
+                        image: sub.iconImage.toString(),
+                        placeholder: kTransparentImage,
+                      )));
+            } else {
+              icon = Icon(
+                Icons.image,
+                color: Theme.of(context).accentColor,
+              );
+            }
+            return Material(
+                color: Theme.of(context).primaryColor,
+                child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => SubredditPostView(
+                                  model: widget.model, sub: sub)));
+                    },
+                    child: ListTile(
+                      leading: icon,
+                      title: Text(sub.displayName,
+                          style: TextStyle(color: Colors.white)),
+                      trailing: Icon(Icons.arrow_forward_ios,
+                          color: Theme.of(context).accentColor),
+                    )));
+          },
+        ),
+      ),
+    );
   }
 }

@@ -1,13 +1,19 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:apollo/AuthModel.dart';
 import 'package:flutter/material.dart';
 import 'package:draw/draw.dart';
 import 'package:video_player/video_player.dart';
-import 'package:transparent_image/transparent_image.dart';
+import 'package:markd/markdown.dart' as Markdown;
+import 'package:flutter_html/flutter_html.dart';
+import 'package:http/http.dart' as http;
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'dart:convert';
-import './hex_color.dart';
-import './dismissible.dart';
 import './comment_tree.dart';
+import './pages/popup_web_view.dart';
+import './link_previewer/link_previewer.dart';
+import './link_previewer/content_direction.dart';
 
 class PostView extends StatefulWidget {
   final Submission submission;
@@ -27,37 +33,44 @@ class PostView extends StatefulWidget {
 enum PostType {
   video,
   image,
+  album,
+  youtube,
   gif,
   text,
   link,
-  unknown,
+  loading,
 }
 
 class _PostViewState extends State<PostView> {
   VideoPlayerController _controller;
+  YoutubePlayerController _youtubePlayerController;
   Future<void> _initializeVideoPlayerFuture;
   double _expandedHeight = 80;
+  bool _videoLoaded = false;
   CommentForest comments;
   CommentForest moreComments;
   List commentThreads = [];
   bool _upvoted = false;
   double offset = 0;
   bool _pastThreshold = false;
-  String mediaLink = "";
+  var _mediaLink;
+  String _body = "";
+  PostType _postType = PostType.loading;
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    _initController();
+    _initPostMedia();
     _upvoted = widget.submission.vote == VoteState.upvoted;
     if (widget.submission.comments == null) {
       widget.submission.refreshComments().whenComplete(() {
-        setState(() {
-          comments = widget.submission.comments;
-          commentThreads = widget.submission.comments.comments;
-          // debugPrint(comments.comments[1].replies.comments.length.toString());
-        });
+        if (this.mounted)
+          setState(() {
+            comments = widget.submission.comments;
+            commentThreads = widget.submission.comments.comments;
+            // debugPrint(comments.comments[1].replies.comments.length.toString());
+          });
       });
     } else {
       comments = widget.submission.comments;
@@ -65,31 +78,33 @@ class _PostViewState extends State<PostView> {
     }
   }
 
-  _initController() {
-    Map<String, dynamic> submissionJSON =
-        jsonDecode(widget.submission.toString());
-    if (widget.submission.data["secure_media"] != null &&
-        widget.submission.data["secure_media"]["reddit_video"] != null) {
-      _controller = VideoPlayerController.network(widget
-          .submission.data["secure_media"]["reddit_video"]["fallback_url"]
-          .toString());
-    } else if (submissionJSON["crosspost_parent_list"] != null &&
-        submissionJSON["crosspost_parent_list"][0]["secure_media"]
-                ["reddit_video"] !=
-            null) {
-      _controller = VideoPlayerController.network(
-          submissionJSON["crosspost_parent_list"][0]["secure_media"]
-                  ["reddit_video"]["fallback_url"]
-              .toString());
-    }
-    if (_controller == null) return;
-    _initializeVideoPlayerFuture = _controller.initialize();
-    _initializeVideoPlayerFuture.whenComplete(() {
-      _expandedHeight = (_controller.value.size.height *
-              MediaQuery.of(context).size.width /
-              _controller.value.size.width)
-          .clamp(0, MediaQuery.of(context).size.height * 4 / 5);
-      setState(() {});
+  _initPostMedia() async {
+    await _determinePostType(widget.submission).whenComplete(() {
+      debugPrint("completed: " + _postType.toString());
+      if (_postType == PostType.video) {
+        _controller = VideoPlayerController.network(_mediaLink);
+      } else if (_postType == PostType.youtube) {
+        _youtubePlayerController = YoutubePlayerController(
+          initialVideoId: YoutubePlayer.convertUrlToId(_mediaLink),
+          flags: YoutubePlayerFlags(
+            autoPlay: true,
+            mute: false,
+            controlsVisibleAtStart: true,
+          ),
+        );
+      }
+      if (this.mounted) setState(() {});
+      if (_controller != null) {
+        _initializeVideoPlayerFuture = _controller.initialize();
+        _initializeVideoPlayerFuture.whenComplete(() {
+          _expandedHeight = (_controller.value.size.height *
+                  MediaQuery.of(context).size.width /
+                  _controller.value.size.width)
+              .clamp(0, MediaQuery.of(context).size.height * 4 / 5);
+          _videoLoaded = true;
+          if (this.mounted) setState(() {});
+        });
+      }
     });
   }
 
@@ -112,23 +127,21 @@ class _PostViewState extends State<PostView> {
                     // If the VideoPlayerController has finished initialization, use
                     // the data it provides to limit the aspect ratio of the VideoPlayer.
                     return ConstrainedBox(
-                        constraints: BoxConstraints(
-                            maxHeight:
-                                MediaQuery.of(context).size.height * 4 / 5),
-                        child: AspectRatio(
-                            aspectRatio: _controller.value.aspectRatio,
+                      constraints: BoxConstraints(
+                          maxHeight:
+                              MediaQuery.of(context).size.height * 4 / 5),
+                      child: AspectRatio(
+                        aspectRatio: _controller.value.aspectRatio,
 
-                            // Use the VideoPlayer widget to display the video.
-                            child: Stack(
-                              alignment: Alignment.bottomCenter,
-                              children: <Widget>[
-                                VideoPlayer(_controller),
-                                VideoProgressIndicator(
-                                  _controller,
-                                  allowScrubbing: true,
-                                )
-                              ],
-                            )));
+                        // Use the VideoPlayer widget to display the video.
+                        child: Stack(
+                          alignment: Alignment.bottomCenter,
+                          children: <Widget>[
+                            VideoPlayer(_controller),
+                          ],
+                        ),
+                      ),
+                    );
                   } else {
                     // If the VideoPlayerController is still initializing, show a
                     // loading spinner.
@@ -153,10 +166,55 @@ class _PostViewState extends State<PostView> {
     );
   }
 
+  Widget _buildYoutubeVideo() {
+    return SliverAppBar(
+      leading: Container(),
+      expandedHeight: _expandedHeight,
+      floating: false,
+      flexibleSpace: FlexibleSpaceBar(
+        background: YoutubePlayer(
+          controller: _youtubePlayerController,
+          showVideoProgressIndicator: true,
+          progressColors: ProgressBarColors(
+            playedColor: Colors.amber,
+            handleColor: Colors.amberAccent,
+          ),
+          onReady: () {
+            setState(() {
+              //TODO make this not just 1920 x 1080 aspect ratio hard coded
+              _expandedHeight = 1080 * MediaQuery.of(context).size.width / 1920;
+            });
+            debugPrint(_youtubePlayerController.value.toString());
+            // _youtubePlayerController.addListener(() {
+            //   debugPrint("some listener");
+            // });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoScrubber() {
+    if (!_videoLoaded) {
+      return SliverToBoxAdapter(
+        child: Container(),
+      );
+    } else {
+      return SliverToBoxAdapter(
+        child: Container(
+          child: VideoProgressIndicator(
+            _controller,
+            allowScrubbing: true,
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildImage() {
     Image image;
     image = Image.network(
-      mediaLink,
+      _mediaLink,
       loadingBuilder: (BuildContext context, Widget child,
           ImageChunkEvent loadingProgress) {
         if (loadingProgress == null) {
@@ -172,17 +230,17 @@ class _PostViewState extends State<PostView> {
         );
       },
     );
-    Completer<Image> completer = Completer<Image>();
     image.image
         .resolve(new ImageConfiguration())
         .addListener(new ImageStreamListener((ImageInfo info, bool _) {
+      if (!this.mounted) return;
       setState(() {
         _expandedHeight = (info.image.height *
                 MediaQuery.of(context).size.width /
                 info.image.width)
             .clamp(0, MediaQuery.of(context).size.height * 4 / 5);
       });
-      completer.complete();
+      // completer.complete();
     }));
 
     return SliverAppBar(
@@ -195,153 +253,246 @@ class _PostViewState extends State<PostView> {
     );
   }
 
+  Widget _buildLink() {
+    return SliverToBoxAdapter(
+      child: Container(
+        color: Theme.of(context).primaryColor,
+        padding: EdgeInsets.all(10),
+        child: LinkPreviewer(
+          borderColor: Theme.of(context).accentColor,
+          backgroundColor: Theme.of(context).primaryColor,
+          link: _mediaLink,
+          direction: ContentDirection.horizontal,
+          placeholder: CircularProgressIndicator(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlbum() {
+    List<Image> images = <Image>[];
+    List<double> heights = <double>[];
+    for (int i = 0; i < _mediaLink.length; i++) {
+      heights.add(80);
+      images.add(Image.network(
+        _mediaLink[i],
+        loadingBuilder: (BuildContext context, Widget child,
+            ImageChunkEvent loadingProgress) {
+          if (loadingProgress == null) {
+            return child;
+          }
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes
+                  : null,
+            ),
+          );
+        },
+      ));
+      images[i]
+          .image
+          .resolve(new ImageConfiguration())
+          .addListener(new ImageStreamListener((ImageInfo info, bool _) {
+        heights[i] = (info.image.height *
+                MediaQuery.of(context).size.width /
+                info.image.width)
+            .clamp(0, MediaQuery.of(context).size.height * 4 / 5);
+        if (i == 0) {
+          setState(() {
+            _expandedHeight = heights[i];
+          });
+        }
+        // completer.complete();
+      }));
+    }
+    return SliverAppBar(
+      leading: Container(),
+      expandedHeight: _expandedHeight,
+      floating: false,
+      flexibleSpace: FlexibleSpaceBar(
+        background: PageView.builder(
+          physics: BouncingScrollPhysics(),
+          itemBuilder: (BuildContext context, int index) {
+            if (index >= images.length) {
+              return Container();
+            }
+            return images[index];
+          },
+          itemCount: images.length,
+          onPageChanged: (int index) {
+            setState(() {
+              _expandedHeight = heights[index];
+            });
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildPostHeader() {
     return SliverToBoxAdapter(
       child: Container(
         child: Material(
           color: Theme.of(context).primaryColor,
           child: Container(
-            padding: EdgeInsets.only(bottom: 20, left: 0, right: 0, top: 10),
-            child: DismissibleCustom(
-              background: Container(
-                color: Theme.of(context).backgroundColor,
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                alignment: AlignmentDirectional.center,
-              ),
-              secondaryBackground: Container(
-                color: _getCurrentPullColor(),
-                padding: EdgeInsets.only(right: 20),
-                alignment: Alignment((1.2 + offset * 2), 0),
-                child: Icon(
-                  _getCurrentIcon(),
-                  color: Colors.white,
-                  size: 25,
-                ),
-              ),
-              dismissThresholds: {
-                DismissDirection.endToStart: 0.2,
-                DismissDirection.startToEnd: 1,
-              },
-              onDismissed: (direction, extent) {
-                double percentage =
-                    extent.abs() / MediaQuery.of(context).size.width;
-                if (percentage < 0.4) {
-                  _toggleVote();
-                }
-              },
-              onMove: (extent) {
-                setState(() {
-                  offset = extent / MediaQuery.of(context).size.width;
-                  _pastThreshold = offset.abs() > 0.2;
-                });
-              },
-              movementDuration: Duration(milliseconds: 200),
-              key: Key(widget.submission.id),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: <Widget>[
-                  Container(
-                    padding: EdgeInsets.only(
-                      right: 8,
-                      left: 17,
-                    ),
-                    child: Row(
-                      // mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: <Widget>[
-                        Flexible(
-                          flex: 100,
-                          child: Text(
-                            widget.submission.title,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
+            padding: EdgeInsets.only(bottom: 0, left: 0, right: 0, top: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Container(
+                  padding: EdgeInsets.only(
+                    right: 8,
+                    left: 17,
+                  ),
+                  child: Row(
+                    // mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: <Widget>[
+                      Flexible(
+                        flex: 100,
+                        child: Text(
+                          widget.submission.title,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
                           ),
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.only(
+                    top: 10,
+                    left: 20,
+                    right: 20,
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Text("r/" + widget.submission.subreddit.displayName,
+                          style: TextStyle(
+                            color: Theme.of(context).accentColor,
+                            fontSize: 12,
+                          )),
+                      Spacer(
+                        flex: 2,
+                      ),
+                      Text(widget.submission.author,
+                          style: TextStyle(
+                            color: Theme.of(context).accentColor,
+                            fontSize: 12,
+                          )),
+                      Spacer(
+                        flex: 2,
+                      ),
+                      Text(_timeSince(widget.submission.createdUtc),
+                          style: TextStyle(
+                            color: Theme.of(context).accentColor,
+                            fontSize: 12,
+                          )),
+                      Spacer(
+                        flex: 20,
+                      )
+                    ],
+                  ),
+                ),
+                Container(
+                  color: Theme.of(context).primaryColor,
+                  padding: EdgeInsets.only(bottom: 15, right: 20, left: 20),
+                  child: Html(
+                    data: Markdown.markdownToHtml(
+                      _body,
+                      extensionSet: Markdown.ExtensionSet.gitHubWeb,
+                      inlineSyntaxes: [
+                        Markdown.CodeSyntax(),
+                        Markdown.AutolinkExtensionSyntax()
+                      ],
+                      blockSyntaxes: [
+                        Markdown.BlockquoteSyntax(),
+                        Markdown.CodeBlockSyntax(),
                       ],
                     ),
+                    defaultTextStyle: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                    ),
+                    onLinkTap: (String url) {
+                      debugPrint(url);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PopupWebView(url: url),
+                        ),
+                      );
+                    },
                   ),
-                  Container(
-                      padding: EdgeInsets.only(
-                        top: 20,
-                        left: 20,
-                        right: 20,
-                      ),
-                      child: Row(
-                        children: <Widget>[
-                          Text("r/" + widget.submission.subreddit.displayName,
-                              style: TextStyle(
-                                color: Theme.of(context).accentColor,
-                                fontSize: 12,
-                              )),
-                          Spacer(
-                            flex: 2,
-                          ),
-                          Text(widget.submission.author,
-                              style: TextStyle(
-                                color: Theme.of(context).accentColor,
-                                fontSize: 12,
-                              )),
-                          Spacer(
-                            flex: 2,
-                          ),
-                          Text(_timeSince(widget.submission.createdUtc),
-                              style: TextStyle(
-                                color: Theme.of(context).accentColor,
-                                fontSize: 12,
-                              )),
-                          Spacer(
-                            flex: 20,
-                          )
-                        ],
-                      )),
-                  Container(
-                      padding: EdgeInsets.only(
-                        top: 20,
-                        left: 20,
-                        right: 20,
-                      ),
-                      child: Row(
-                        children: <Widget>[
-                          Icon(
-                            Icons.arrow_upward,
-                            color: _upvoted
-                                ? Theme.of(context).secondaryHeaderColor
-                                : Theme.of(context).accentColor,
-                            size: 15,
-                          ),
-                          Spacer(
-                            flex: 1,
-                          ),
-                          Text(widget.submission.upvotes.toString(),
-                              style: TextStyle(
-                                  color: _upvoted
-                                      ? Theme.of(context).secondaryHeaderColor
-                                      : Theme.of(context).accentColor,
-                                  fontSize: 12)),
-                          Spacer(
-                            flex: 3,
-                          ),
-                          Icon(Icons.comment,
-                              color: Theme.of(context).accentColor, size: 15),
-                          Spacer(
-                            flex: 1,
-                          ),
-                          Text(widget.submission.numComments.toString(),
-                              style: TextStyle(
-                                color: Theme.of(context).accentColor,
-                                fontSize: 12,
-                              )),
-                          Spacer(flex: 40),
-                        ],
-                      ))
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildPostInfo() {
+    return SliverToBoxAdapter(
+        child: Container(
+            // color: Theme.of(context).primaryColor,
+            padding: EdgeInsets.only(
+              top: 10,
+              left: 20,
+              right: 20,
+              bottom: 10,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor,
+              border: Border(
+                top: BorderSide(
+                  width: 0.25,
+                  color: Theme.of(context).accentColor.withOpacity(0.5),
+                ),
+                bottom: BorderSide(
+                  width: 0.25,
+                  color: Theme.of(context).accentColor.withOpacity(0.5),
+                ),
+              ),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  Icons.arrow_upward,
+                  color: _upvoted
+                      ? Theme.of(context).secondaryHeaderColor
+                      : Theme.of(context).accentColor,
+                  size: 15,
+                ),
+                Spacer(
+                  flex: 1,
+                ),
+                Text(widget.submission.upvotes.toString(),
+                    style: TextStyle(
+                        color: _upvoted
+                            ? Theme.of(context).secondaryHeaderColor
+                            : Theme.of(context).accentColor,
+                        fontSize: 12)),
+                Spacer(
+                  flex: 3,
+                ),
+                Icon(Icons.comment,
+                    color: Theme.of(context).accentColor, size: 15),
+                Spacer(
+                  flex: 1,
+                ),
+                Text(widget.submission.numComments.toString(),
+                    style: TextStyle(
+                      color: Theme.of(context).accentColor,
+                      fontSize: 12,
+                    )),
+                Spacer(flex: 40),
+              ],
+            )));
   }
 
   Widget _buildComments() {
@@ -378,25 +529,56 @@ class _PostViewState extends State<PostView> {
   }
 
   List<Widget> _buildSlivers() {
-    if (_determinePostType(widget.submission) == PostType.video) {
+    if (_postType == PostType.video) {
       return <Widget>[
         _buildVideo(),
+        _buildVideoScrubber(),
         _buildPostHeader(),
+        _buildPostInfo(),
         _buildComments(),
         _buildCommentLoadingIndicator(),
         SliverFillRemaining(),
       ];
-    } else if (_determinePostType(widget.submission) == PostType.image) {
+    } else if (_postType == PostType.youtube) {
+      return <Widget>[
+        _buildYoutubeVideo(),
+        _buildPostHeader(),
+        _buildPostInfo(),
+        _buildComments(),
+        _buildCommentLoadingIndicator(),
+        SliverFillRemaining(),
+      ];
+    } else if (_postType == PostType.image) {
       return <Widget>[
         _buildImage(),
         _buildPostHeader(),
+        _buildPostInfo(),
         _buildComments(),
         _buildCommentLoadingIndicator(),
         SliverFillRemaining(),
       ];
-    } else if (_determinePostType(widget.submission) == PostType.text) {
+    } else if (_postType == PostType.text) {
       return <Widget>[
         _buildPostHeader(),
+        _buildPostInfo(),
+        _buildComments(),
+        _buildCommentLoadingIndicator(),
+        SliverFillRemaining(),
+      ];
+    } else if (_postType == PostType.link) {
+      return <Widget>[
+        _buildPostHeader(),
+        _buildLink(),
+        _buildPostInfo(),
+        _buildComments(),
+        _buildCommentLoadingIndicator(),
+        SliverFillRemaining(),
+      ];
+    } else if (_postType == PostType.album) {
+      return <Widget>[
+        _buildAlbum(),
+        _buildPostHeader(),
+        _buildPostInfo(),
         _buildComments(),
         _buildCommentLoadingIndicator(),
         SliverFillRemaining(),
@@ -404,6 +586,7 @@ class _PostViewState extends State<PostView> {
     } else {
       return <Widget>[
         _buildPostHeader(),
+        _buildPostInfo(),
         _buildComments(),
         _buildCommentLoadingIndicator(),
         SliverFillRemaining(),
@@ -432,7 +615,7 @@ class _PostViewState extends State<PostView> {
     );
   }
 
-  PostType _determinePostType(Submission post) {
+  Future<PostType> _determinePostType(Submission post) async {
     // debugPrint(post.toString());
     Map<String, dynamic> submission = jsonDecode(post.toString());
     //detecting crosspost
@@ -450,7 +633,10 @@ class _PostViewState extends State<PostView> {
               submission["crosspost_parent_list"][0]["secure_media"]
                       ["reddit_video"]["fallback_url"]
                   .toString());
-          return PostType.video;
+          _mediaLink = submission["crosspost_parent_list"][0]["secure_media"]
+                  ["reddit_video"]["fallback_url"]
+              .toString();
+          _postType = PostType.video;
         } else {}
       }
     } else if (submission["secure_media"] != null) {
@@ -458,19 +644,31 @@ class _PostViewState extends State<PostView> {
         debugPrint("is a video: " +
             submission["secure_media"]["reddit_video"]["fallback_url"]
                 .toString());
-        return PostType.video;
+        _mediaLink = widget
+            .submission.data["secure_media"]["reddit_video"]["fallback_url"]
+            .toString();
+        _postType = PostType.video;
+      } else if (submission["secure_media"]["type"] == "youtube.com") {
+        _mediaLink = post.url.toString();
+        // debugPrint("youtube needs to be implemented");
+        _postType = PostType.youtube;
       } else {
         if (post.url.toString() != null &&
             post.url.toString().contains("gfycat")) {
-          debugPrint("is a gif: " + post.url.toString() + ".gif");
-          mediaLink = post.url.toString();
-          return PostType.gif;
-        } else {
-          debugPrint("is a picture: " + post.url.toString());
-          mediaLink = post.url.toString();
-          return PostType.image;
+          // debugPrint("is a gfycat: " + post.url.toString());
+
+          _mediaLink = await _fixGfycatUrl(post.url);
+          // debugPrint(_mediaLink);
+          _postType = PostType.video;
+        } else if (post.url.toString().contains("imgur")) {
+          await _imgurBullshit(post);
         }
       }
+    } else if (post.url.toString().contains("imgur")) {
+      await _imgurBullshit(post);
+    } else if (submission["selftext"] != "") {
+      _body = submission["selftext"].replaceAll('&gt;', '>');
+      return PostType.text;
     } else {
       String link = post.url.toString();
       if (link.contains(".jpg") ||
@@ -478,13 +676,80 @@ class _PostViewState extends State<PostView> {
           link.contains(".png") ||
           link.contains(".jpeg")) {
         debugPrint("some kind of image/gif: " + post.url.toString());
-        mediaLink = post.url.toString();
-        return PostType.image;
+        _mediaLink = post.url.toString();
+        _postType = PostType.image;
       } else {
-        debugPrint("not an image");
-        return PostType.text;
+        debugPrint("fallback to link: " + post.toString());
+        _mediaLink = post.url.toString();
+        _postType = PostType.link;
       }
     }
+  }
+
+  _imgurBullshit(post) async {
+    _mediaLink = post.url.toString();
+    String url = "";
+    if (_mediaLink.contains("/a/")) {
+      String id = _mediaLink.substring(
+          _mediaLink.indexOf("/a/") + 3, _mediaLink.length);
+      url = "https://api.imgur.com/3/album/" + id + "/images";
+      debugPrint(url);
+      var response = await http.get(url, headers: {
+        HttpHeaders.authorizationHeader: "Client-ID 995c8e71e9eeafd"
+      });
+      var responseJson = json.decode(response.body);
+      debugPrint(responseJson["data"].length.toString());
+      if (responseJson["data"].length == 1) {
+        if (responseJson["data"][0]["link"].toString().contains(".mp4")) {
+          _mediaLink = responseJson["data"][0]["link"].toString();
+          _postType = PostType.video;
+        } else {
+          _mediaLink = responseJson["data"][0]["link"].toString();
+          _postType = PostType.image;
+        }
+      } else {
+        debugPrint(responseJson.toString());
+        List<String> links = <String>[];
+        for (int i = 0; i < responseJson["data"].length; i++) {
+          links.add(responseJson["data"][i]["link"].toString());
+          // debugPrint(responseJson["data"][i]["link"].toString());
+        }
+        _mediaLink = links;
+        _postType = PostType.album;
+      }
+    } else {
+      String id = _mediaLink.substring(_mediaLink.indexOf("imgur.com") + 9);
+      url = "https://api.imgur.com/3/image/" + id;
+      debugPrint(url);
+      var response = await http.get(url, headers: {
+        HttpHeaders.authorizationHeader: "Client-ID 995c8e71e9eeafd"
+      });
+      var responseJson = json.decode(response.body);
+      debugPrint(responseJson["data"].length.toString());
+      if (responseJson["data"]["link"].toString().contains(".mp4")) {
+        _mediaLink = responseJson["data"]["link"].toString();
+        _postType = PostType.video;
+      } else {
+        _mediaLink = responseJson["data"]["link"].toString();
+        _postType = PostType.image;
+      }
+    }
+  }
+
+  Future<String> _fixGfycatUrl(Uri uri) async {
+    RegExp videoNameParser = new RegExp("[a-z]+", caseSensitive: false);
+    var videoname = videoNameParser.firstMatch(uri.path).group(0);
+    var api = "https://api.gfycat.com/v1/gfycats/$videoname";
+
+    var result = await http.get(api);
+    Map decodedResult = jsonDecode(result.body)["gfyItem"];
+
+    // debugPrint(result.body.toString());
+
+    assert(decodedResult != null, result.body);
+
+    debugPrint(decodedResult["mp4Url"].toString());
+    return decodedResult["mp4Url"].toString();
   }
 
   _timeSince(DateTime date) {
@@ -505,51 +770,5 @@ class _PostViewState extends State<PostView> {
       return difference.inMinutes.toString() + " minutes ago";
     }
     return difference.inSeconds.floor().toString() + " seconds ago";
-  }
-
-  Color _getCurrentPullColor() {
-    if (_pastThreshold) {
-      if (offset.abs() > 0.4) {
-        return HexColor('#00AC37');
-      } else {
-        return Theme.of(context).secondaryHeaderColor;
-      }
-    } else {
-      return Theme.of(context).backgroundColor;
-    }
-  }
-
-  IconData _getCurrentIcon() {
-    if (_pastThreshold) {
-      if (offset.abs() > 0.4) {
-        return Icons.bookmark;
-      } else {
-        return Icons.arrow_upward;
-      }
-    } else {
-      return Icons.arrow_upward;
-    }
-  }
-
-  _toggleVote() {
-    if (widget.submission.vote == VoteState.upvoted) {
-      try {
-        widget.submission.clearVote();
-        setState(() {
-          _upvoted = false;
-        });
-        // _posts[index].clearVote();
-      } catch (e) {}
-    } else {
-      try {
-        // widget.upVote();
-        widget.submission.upvote();
-        setState(() {
-          _upvoted = true;
-        });
-      } catch (e) {
-        debugPrint(e.toString());
-      }
-    }
   }
 }
