@@ -1,4 +1,5 @@
 import 'package:apollo/custom_app_bar.dart';
+import 'package:apollo/dismissible.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/cupertino.dart';
@@ -7,6 +8,7 @@ import 'package:draw/draw.dart';
 import './slidable_list_tile.dart';
 import './AuthModel.dart';
 import './post_view.dart';
+import './page_route.dart';
 
 class SubredditPostView extends StatefulWidget {
   @required
@@ -26,7 +28,7 @@ class _SubredditPostViewState extends State<SubredditPostView> {
   StreamSubscription<UserContent> stream;
   var _postsTemp = <Submission>[];
   bool _alreadyLoading = true;
-
+  double _offset = 0.0;
   listen() async {
     if (stream != null) stream.cancel();
     if (widget.model.subStreams.containsKey(widget.sub.id)) {
@@ -71,16 +73,30 @@ class _SubredditPostViewState extends State<SubredditPostView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return DismissibleCustom(
+      dismissThresholds: {
+        DismissDirection.startToEnd: 0.3,
+      },
+      key: Key('subreddit_post_view'),
+      onDismissed: (direction, amount) {
+        Navigator.pop(context);
+      },
+      direction: DismissDirection.startToEnd,
+      onMove: (amount) {
+        debugPrint(amount.toString());
+      },
+      child: Scaffold(
         backgroundColor: Theme.of(context).primaryColor,
         appBar: CustomAppBar(title: 'r/' + widget.sub.displayName),
-        body: _buildList());
+        body: _buildList(),
+      ),
+    );
   }
 
   _buildList() {
-    return Scaffold(
-      backgroundColor: Theme.of(context).backgroundColor,
-      body: RefreshIndicator(
+    return Container(
+      color: Theme.of(context).backgroundColor,
+      child: RefreshIndicator(
         onRefresh: () async {},
         child: ListView.builder(
           shrinkWrap: false,
@@ -110,7 +126,7 @@ class _SubredditPostViewState extends State<SubredditPostView> {
                 // debugPrint(post.data.toString());
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
+                  TransparentRoute(
                     builder: (context) => PostView(
                       submission: post,
                       comments: post.comments,
@@ -123,22 +139,22 @@ class _SubredditPostViewState extends State<SubredditPostView> {
           },
         ),
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 60),
-        child: FloatingActionButton(
-          onPressed: () async {
-            if (widget.model.reddit != null) {
-              _posts = <Submission>[];
-              setState(() {});
-              _loadPosts();
-            } else {
-              widget.model.login(context, listen);
-            }
-          },
-          child: Icon(Icons.refresh),
-          backgroundColor: Theme.of(context).secondaryHeaderColor,
-        ),
-      ),
+      // floatingActionButton: Padding(
+      //   padding: const EdgeInsets.only(bottom: 60),
+      //   child: FloatingActionButton(
+      //     onPressed: () async {
+      //       if (widget.model.reddit != null) {
+      //         _posts = <Submission>[];
+      //         setState(() {});
+      //         _loadPosts();
+      //       } else {
+      //         widget.model.login(context, listen);
+      //       }
+      //     },
+      //     child: Icon(Icons.refresh),
+      //     backgroundColor: Theme.of(context).secondaryHeaderColor,
+      //   ),
+      // ),
     );
   }
 }

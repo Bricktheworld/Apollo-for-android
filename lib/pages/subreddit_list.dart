@@ -2,8 +2,11 @@ import 'package:apollo/custom_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:draw/draw.dart';
 import '../AuthModel.dart';
+import '../page_route.dart';
 import '../subreddit_post_view.dart';
 import 'package:transparent_image/transparent_image.dart';
+
+import 'front_page_view.dart';
 
 class SubredditListView extends StatefulWidget {
   final AuthModel model;
@@ -44,7 +47,9 @@ class _SubredditListViewState extends State<SubredditListView> {
           .toString()
           .toLowerCase()
           .compareTo(b.displayName.toString().toLowerCase()));
-      setState(() {});
+      if (this.mounted) {
+        setState(() {});
+      }
       debugPrint(subreddits.length.toString());
     }
 
@@ -70,8 +75,6 @@ class _SubredditListViewState extends State<SubredditListView> {
     );
   }
 
-  _goToSubreddit(Subreddit sub) {}
-
   _buildList() {
     return Scaffold(
       floatingActionButton: Padding(
@@ -90,14 +93,37 @@ class _SubredditListViewState extends State<SubredditListView> {
         },
         child: ListView.builder(
           physics: BouncingScrollPhysics(),
-          itemCount: subreddits.length + 1,
+          itemCount: subreddits.length + 2,
           itemBuilder: (BuildContext context, int index) {
-            if (index >= subreddits.length) {
+            if (index == 0) {
+              return Material(
+                  color: Theme.of(context).primaryColor,
+                  child: InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          TransparentRoute(
+                            builder: (BuildContext context) => FrontPageView(
+                              model: widget.model,
+                            ),
+                          ),
+                        );
+                      },
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.home,
+                          color: Theme.of(context).accentColor,
+                        ),
+                        title: Text("Front Page",
+                            style: TextStyle(color: Colors.white)),
+                        trailing: Icon(Icons.arrow_forward_ios,
+                            color: Theme.of(context).accentColor),
+                      )));
+            } else if (index >= subreddits.length + 1) {
               return Container(
                 height: 100,
               );
             }
-            Subreddit sub = subreddits[index];
+            Subreddit sub = subreddits[index - 1];
             Widget icon;
             if (sub.iconImage.toString() != "") {
               icon = Container(
@@ -118,11 +144,14 @@ class _SubredditListViewState extends State<SubredditListView> {
                 color: Theme.of(context).primaryColor,
                 child: InkWell(
                     onTap: () {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => SubredditPostView(
-                                  model: widget.model, sub: sub)));
+                      Navigator.of(context).push(
+                        TransparentRoute(
+                          builder: (BuildContext context) => SubredditPostView(
+                            model: widget.model,
+                            sub: sub,
+                          ),
+                        ),
+                      );
                     },
                     child: ListTile(
                       leading: icon,

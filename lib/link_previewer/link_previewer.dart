@@ -8,6 +8,7 @@ import './content_direction.dart';
 import './vertical_link_preview.dart';
 import './horizontal_link_view.dart';
 import '../pages/popup_web_view.dart';
+import '../page_route.dart';
 import 'dart:async';
 
 part 'parser/web_page_parser.dart';
@@ -127,7 +128,7 @@ class _LinkPreviewer extends State<LinkPreviewer> {
   void _launchURL(url) async {
     Navigator.push(
         context,
-        MaterialPageRoute(
+        TransparentRoute(
             builder: (context) => PopupWebView(
                   url: url,
                 )));

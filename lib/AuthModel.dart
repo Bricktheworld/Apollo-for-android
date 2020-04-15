@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:apollo/page_route.dart';
 import 'package:provider/provider.dart';
 import 'package:draw/draw.dart';
 import 'package:flutter/foundation.dart';
@@ -45,7 +46,7 @@ class AuthModel with ChangeNotifier {
           redditTemp.auth.url(['*'], 'logging in', compactLogin: true);
       Navigator.push(
           context,
-          MaterialPageRoute(
+          TransparentRoute(
               builder: (context) => LoginScreen(
                   loginUri: authUrl.toString(),
                   redirectUri: "https://www.reddit.com/r/android",

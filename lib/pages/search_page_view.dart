@@ -6,6 +6,7 @@ import 'package:draw/draw.dart';
 import 'package:http/http.dart' as http;
 
 import '../custom_app_bar.dart';
+import '../page_route.dart';
 
 class SearchPageView extends StatefulWidget {
   final AuthModel model;
@@ -35,7 +36,7 @@ class _SearchPageViewState extends State<SearchPageView> {
     // );
     Navigator.push(
         context,
-        MaterialPageRoute(
+        TransparentRoute(
             builder: (context) => PostView(
                   submission: submission,
                 )));

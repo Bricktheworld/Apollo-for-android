@@ -12,11 +12,10 @@ class MailPageView extends StatefulWidget {
 class _MailPageViewState extends State<MailPageView> {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: Scaffold(
-        backgroundColor: Theme.of(context).backgroundColor,
-        appBar: CustomAppBar(title: 'Inbox'),
-      ),
+    return Scaffold(
+      backgroundColor: Theme.of(context).backgroundColor,
+      appBar: CustomAppBar(title: 'Inbox'),
+      // body: ,
     );
   }
 }

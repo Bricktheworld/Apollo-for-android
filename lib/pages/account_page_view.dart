@@ -10,6 +10,7 @@ import 'package:draw/draw.dart';
 import '../custom_app_bar.dart';
 import '../hex_color.dart';
 import '../account_views/saved_posts_view.dart';
+import '../page_route.dart';
 
 class AccountPageView extends StatefulWidget {
   final AuthModel model;
@@ -93,7 +94,7 @@ class _AccountPageViewState extends State<AccountPageView> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(
+                              TransparentRoute(
                                   builder: (context) => SubmittedPostsView(
                                         currentUser: _redditor,
                                       )),
@@ -125,7 +126,7 @@ class _AccountPageViewState extends State<AccountPageView> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(
+                              TransparentRoute(
                                   builder: (context) => SubmittedCommentsView(
                                         currentUser: _redditor,
                                       )),
@@ -157,7 +158,7 @@ class _AccountPageViewState extends State<AccountPageView> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(
+                              TransparentRoute(
                                   builder: (context) => SavedPostsView(
                                         currentUser: _redditor,
                                       )),
@@ -189,7 +190,7 @@ class _AccountPageViewState extends State<AccountPageView> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(
+                              TransparentRoute(
                                   builder: (context) => UpvotedPostsView(
                                         currentUser: _redditor,
                                       )),
@@ -221,7 +222,7 @@ class _AccountPageViewState extends State<AccountPageView> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(
+                              TransparentRoute(
                                   builder: (context) => DownvotedPostsView(
                                         currentUser: _redditor,
                                       )),

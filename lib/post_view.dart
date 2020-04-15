@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:draw/draw.dart';
 import 'package:video_player/video_player.dart';
 import 'package:markd/markdown.dart' as Markdown;
+import 'package:persistent_bottom_nav_bar/persistent-tab-view.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
@@ -16,6 +17,10 @@ import './comment_tree.dart';
 import './pages/popup_web_view.dart';
 import './link_previewer/link_previewer.dart';
 import './link_previewer/content_direction.dart';
+import 'dismissible.dart';
+import 'hex_color.dart';
+import 'page_route.dart';
+import 'splash_view.dart';
 
 class PostView extends StatefulWidget {
   final Submission submission;
@@ -54,11 +59,12 @@ class _PostViewState extends State<PostView> {
   List commentThreads = [];
   bool _upvoted = false;
   double offset = 0;
-  bool _showingPopupImage = false;
   var _mediaForPopupView;
   var _mediaLink;
   String _body = "";
   PostType _postType = PostType.loading;
+  double _offset = 0;
+  bool _pastThreshold = false;
 
   @override
   void initState() {
@@ -174,11 +180,17 @@ class _PostViewState extends State<PostView> {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () {
-                    setState(() {
-                      _showingPopupImage = true;
-                      _controller.pause();
-                    });
-                    return true;
+                    Navigator.of(context).push(TransparentRoute(
+                        builder: (BuildContext context) => PopupImageView(
+                              media: _mediaForPopupView,
+                            )));
+                    // pushNewScreen(
+                    //   context,
+                    //   screen: PopupImageView(
+                    //     media: _mediaForPopupView,
+                    //   ),
+                    //   withNavBar: false,
+                    // );
                   },
                 ),
               ),
@@ -280,10 +292,24 @@ class _PostViewState extends State<PostView> {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () {
-                    setState(() {
-                      _showingPopupImage = true;
-                    });
-                    return true;
+                    // PageRouteBuilder(
+                    //     opaque: false,
+                    //     pageBuilder: (BuildContext context, _, __) {
+                    //       return PopupImageView(
+                    //         media: _mediaForPopupView,
+                    //       );
+                    //     });
+                    Navigator.of(context).push(TransparentRoute(
+                        builder: (BuildContext context) => PopupImageView(
+                              media: _mediaForPopupView,
+                            )));
+                    // pushNewScreen(
+                    //   context,
+                    //   screen: PopupImageView(
+                    //     media: _mediaForPopupView,
+                    //   ),
+                    //   withNavBar: false,
+                    // );
                   },
                 ),
               ),
@@ -375,107 +401,207 @@ class _PostViewState extends State<PostView> {
 
   Widget _buildPostHeader() {
     return SliverToBoxAdapter(
-      child: Container(
-        child: Material(
-          color: Theme.of(context).primaryColor,
+      child: Material(
+        color: Theme.of(context).primaryColor,
+        child: SplashView(
+          splashFactory: InkRipple.splashFactory,
+          splashColor:
+              _getCurrentPullColor(_pastThreshold, _offset).withOpacity(0.5),
+          background: Container(
+            color: Theme.of(context).backgroundColor,
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            alignment: AlignmentDirectional.center,
+          ),
+          secondaryBackground: Container(
+            color: _getCurrentPullColor(_pastThreshold, _offset),
+            padding: EdgeInsets.only(right: 20),
+            // alignment: Alignment((1.2 + offset * 2), 0),
+            alignment: AlignmentDirectional.centerEnd,
+            child: Icon(
+              _getCurrentIcon(),
+              color: Colors.white,
+              size: 25,
+            ),
+          ),
+          onDismissed: (direction, extent) async {
+            double percentage =
+                extent.abs() / MediaQuery.of(context).size.width;
+            if (percentage < 0.3) {
+              _toggleVote();
+            } else {
+              await _toggleSave();
+            }
+          },
+          onMove: (extent) {
+            var beforePullColor = _getCurrentPullColor(_pastThreshold, _offset);
+            _offset = extent / MediaQuery.of(context).size.width;
+            _pastThreshold = _offset.abs() > 0.1;
+            if (beforePullColor !=
+                _getCurrentPullColor(_pastThreshold, _offset)) {
+              setState(() {});
+            }
+          },
+          key: Key(widget.submission.id),
           child: Container(
-            padding: EdgeInsets.only(bottom: 0, left: 0, right: 0, top: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: <Widget>[
-                Container(
-                  padding: EdgeInsets.only(
-                    right: 8,
-                    left: 17,
-                  ),
-                  child: Row(
-                    // mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: <Widget>[
-                      Flexible(
-                        flex: 100,
-                        child: Text(
-                          widget.submission.title,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
+            child: Container(
+              padding: EdgeInsets.only(bottom: 0, left: 0, right: 0, top: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  Container(
+                    padding: EdgeInsets.only(
+                      right: 8,
+                      left: 17,
+                    ),
+                    child: Row(
+                      // mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: <Widget>[
+                        Flexible(
+                          flex: 100,
+                          child: Text(
+                            widget.submission.title,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.only(
-                    top: 10,
-                    left: 20,
-                    right: 20,
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      Text("r/" + widget.submission.subreddit.displayName,
-                          style: TextStyle(
-                            color: Theme.of(context).accentColor,
-                            fontSize: 12,
-                          )),
-                      Spacer(
-                        flex: 2,
-                      ),
-                      Text(widget.submission.author,
-                          style: TextStyle(
-                            color: Theme.of(context).accentColor,
-                            fontSize: 12,
-                          )),
-                      Spacer(
-                        flex: 2,
-                      ),
-                      Text(_timeSince(widget.submission.createdUtc),
-                          style: TextStyle(
-                            color: Theme.of(context).accentColor,
-                            fontSize: 12,
-                          )),
-                      Spacer(
-                        flex: 20,
-                      )
-                    ],
-                  ),
-                ),
-                Container(
-                  color: Theme.of(context).primaryColor,
-                  padding: EdgeInsets.only(bottom: 15, right: 20, left: 20),
-                  child: Html(
-                    data: Markdown.markdownToHtml(
-                      _body,
-                      extensionSet: Markdown.ExtensionSet.gitHubWeb,
-                      inlineSyntaxes: [
-                        Markdown.CodeSyntax(),
-                        Markdown.AutolinkExtensionSyntax()
-                      ],
-                      blockSyntaxes: [
-                        Markdown.BlockquoteSyntax(),
-                        Markdown.CodeBlockSyntax(),
                       ],
                     ),
-                    defaultTextStyle: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
+                  ),
+                  Container(
+                    padding: EdgeInsets.only(
+                      top: 10,
+                      left: 20,
+                      right: 20,
                     ),
-                    onLinkTap: (String url) {
-                      debugPrint(url);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PopupWebView(url: url),
+                    child: Row(
+                      children: <Widget>[
+                        Text("r/" + widget.submission.subreddit.displayName,
+                            style: TextStyle(
+                              color: Theme.of(context).accentColor,
+                              fontSize: 12,
+                            )),
+                        Spacer(
+                          flex: 2,
                         ),
-                      );
-                    },
+                        Text(widget.submission.author,
+                            style: TextStyle(
+                              color: Theme.of(context).accentColor,
+                              fontSize: 12,
+                            )),
+                        Spacer(
+                          flex: 2,
+                        ),
+                        Text(_timeSince(widget.submission.createdUtc),
+                            style: TextStyle(
+                              color: Theme.of(context).accentColor,
+                              fontSize: 12,
+                            )),
+                        Spacer(
+                          flex: 20,
+                        )
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  Container(
+                    color: Theme.of(context).primaryColor,
+                    padding: EdgeInsets.only(bottom: 15, right: 20, left: 20),
+                    child: Html(
+                      data: Markdown.markdownToHtml(
+                        _body,
+                        extensionSet: Markdown.ExtensionSet.gitHubWeb,
+                        inlineSyntaxes: [
+                          Markdown.CodeSyntax(),
+                          Markdown.AutolinkExtensionSyntax()
+                        ],
+                        blockSyntaxes: [
+                          Markdown.BlockquoteSyntax(),
+                          Markdown.CodeBlockSyntax(),
+                        ],
+                      ),
+                      defaultTextStyle: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
+                      onLinkTap: (String url) {
+                        debugPrint(url);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PopupWebView(url: url),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  Color _getCurrentPullColor(bool threshold, currentOffset) {
+    if (threshold) {
+      if (currentOffset.abs() > 0.3) {
+        return HexColor('#00AC37');
+      } else {
+        return Theme.of(context).secondaryHeaderColor;
+      }
+    } else {
+      return Theme.of(context).backgroundColor;
+    }
+  }
+
+  IconData _getCurrentIcon() {
+    if (_pastThreshold) {
+      if (_offset.abs() > 0.3) {
+        return Icons.bookmark;
+      } else {
+        return Icons.arrow_upward;
+      }
+    } else {
+      return Icons.arrow_upward;
+    }
+  }
+
+  _toggleVote() {
+    if (widget.submission.vote == VoteState.upvoted) {
+      try {
+        widget.submission.clearVote();
+        setState(() {
+          _upvoted = false;
+        });
+        // _posts[index].clearVote();
+      } catch (e) {}
+    } else {
+      try {
+        widget.submission.upvote();
+        setState(() {
+          _upvoted = true;
+        });
+      } catch (e) {}
+    }
+  }
+
+  _toggleSave() async {
+    await widget.submission.refresh();
+    if (widget.submission.saved) {
+      try {
+        widget.submission.unsave();
+      } catch (e) {
+        debugPrint(e.toString());
+      }
+    } else {
+      try {
+        widget.submission.save();
+      } catch (e) {
+        debugPrint(e.toString());
+      }
+    }
   }
 
   Widget _buildPostInfo() {
@@ -645,27 +771,26 @@ class _PostViewState extends State<PostView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // appBar: CustomAppBar(title: widget.submission.title),
-      backgroundColor: Theme.of(context).backgroundColor,
-      body: SafeArea(
-        child: Stack(
-          fit: StackFit.passthrough,
-          children: <Widget>[
-            CustomScrollView(
-              physics: BouncingScrollPhysics(),
-              slivers: _buildSlivers(),
-            ),
-            PopupImageView(
-              isShown: _showingPopupImage,
-              media: _mediaForPopupView,
-              onDismiss: () {
-                setState(() {
-                  _showingPopupImage = false;
-                });
-              },
-            ),
-          ],
+    return DismissibleCustom(
+      dismissThresholds: {
+        DismissDirection.startToEnd: 0.3,
+      },
+      key: Key('subreddit_post_view'),
+      onDismissed: (direction, amount) {
+        Navigator.pop(context);
+      },
+      direction: DismissDirection.startToEnd,
+      onMove: (amount) {
+        debugPrint(amount.toString());
+      },
+      child: Scaffold(
+        // appBar: CustomAppBar(title: widget.submission.title),
+        backgroundColor: Theme.of(context).backgroundColor,
+        body: SafeArea(
+          child: CustomScrollView(
+            physics: BouncingScrollPhysics(),
+            slivers: _buildSlivers(),
+          ),
         ),
       ),
     );
@@ -776,7 +901,12 @@ class _PostViewState extends State<PostView> {
     } else {
       debugPrint(_mediaLink);
       String id = _mediaLink.substring(
-          _mediaLink.indexOf("imgur.com/") + 10, _mediaLink.length - 4);
+          _mediaLink.indexOf("imgur.com/") + 10,
+          _mediaLink[_mediaLink.length - 4] == '.'
+              ? _mediaLink.length - 4
+              : _mediaLink[_mediaLink.length - 5] == '.'
+                  ? _mediaLink.length - 5
+                  : _mediaLink.length);
       url = "https://api.imgur.com/3/image/" + id;
       debugPrint(url);
       var response = await http.get(url, headers: {

@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
 
 // import 'automatic_keep_alive.dart';
 // import 'basic.dart';
@@ -241,6 +242,8 @@ class _DismissibleCustomState extends State<DismissibleCustom>
   double _dragExtent = 0.0;
   bool _dragUnderway = false;
   Size _sizePriorToCollapse;
+  bool _alreadyEvaluatedIfDragShouldOccur = false;
+  bool _shouldBeDragged = false;
 
   @override
   bool get wantKeepAlive =>
@@ -291,6 +294,7 @@ class _DismissibleCustomState extends State<DismissibleCustom>
   }
 
   void _handleDragStart(DragStartDetails details) {
+    debugPrint("drag start");
     _dragUnderway = true;
     if (_moveController.isAnimating) {
       _dragExtent =
@@ -306,6 +310,31 @@ class _DismissibleCustomState extends State<DismissibleCustom>
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
+    if (!_alreadyEvaluatedIfDragShouldOccur) {
+      switch (widget.direction) {
+        case DismissDirection.horizontal:
+        case DismissDirection.vertical:
+          _shouldBeDragged = true;
+          break;
+        case DismissDirection.up:
+          _shouldBeDragged = _dragExtent + details.primaryDelta < 0;
+          break;
+        case DismissDirection.down:
+          _shouldBeDragged = _dragExtent + details.primaryDelta > 0;
+          debugPrint(_shouldBeDragged.toString());
+          break;
+        case DismissDirection.endToStart:
+          _shouldBeDragged = _dragExtent + details.primaryDelta < 0;
+          break;
+
+        case DismissDirection.startToEnd:
+          _shouldBeDragged = _dragExtent + details.primaryDelta > 0;
+          break;
+      }
+      _alreadyEvaluatedIfDragShouldOccur = true;
+    } else {
+      if (!_shouldBeDragged) return;
+    }
     if (!_isActive || _moveController.isAnimating) return;
 
     final double delta = details.primaryDelta;
@@ -418,6 +447,13 @@ class _DismissibleCustomState extends State<DismissibleCustom>
   }
 
   Future<void> _handleDragEnd(DragEndDetails details) async {
+    _alreadyEvaluatedIfDragShouldOccur = false;
+    setState(() {});
+    if (!_shouldBeDragged) {
+      _shouldBeDragged = false;
+      return;
+    }
+
     if (!_isActive || _moveController.isAnimating) return;
     _dragUnderway = false;
     // if (_moveController.isCompleted &&
@@ -598,17 +634,68 @@ class _DismissibleCustomState extends State<DismissibleCustom>
         content,
       ]);
     }
+
     // We are not resizing but we may be being dragging in widget.direction.
-    return GestureDetector(
-      onHorizontalDragStart: _directionIsXAxis ? _handleDragStart : null,
-      onHorizontalDragUpdate: _directionIsXAxis ? _handleDragUpdate : null,
-      onHorizontalDragEnd: _directionIsXAxis ? _handleDragEnd : null,
-      onVerticalDragStart: _directionIsXAxis ? null : _handleDragStart,
-      onVerticalDragUpdate: _directionIsXAxis ? null : _handleDragUpdate,
-      onVerticalDragEnd: _directionIsXAxis ? null : _handleDragEnd,
-      behavior: HitTestBehavior.opaque,
-      child: content,
-      dragStartBehavior: widget.dragStartBehavior,
-    );
+    if (_directionIsXAxis) {
+      return RawGestureDetector(
+        gestures: {
+          HorizontalGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<HorizontalGestureRecognizer>(
+            () => HorizontalGestureRecognizer(),
+            (HorizontalGestureRecognizer instance) {
+              instance.onStart = _directionIsXAxis ? _handleDragStart : null;
+              instance.onUpdate = _directionIsXAxis ? _handleDragUpdate : null;
+              instance.onEnd = _directionIsXAxis ? _handleDragEnd : null;
+            },
+          )
+        },
+        // onHorizontalDragStart: _directionIsXAxis ? _handleDragStart : null,
+        // onHorizontalDragUpdate: _directionIsXAxis ? _handleDragUpdate : null,
+        // onHorizontalDragEnd: _directionIsXAxis ? _handleDragEnd : null,
+        // onVerticalDragStart: _directionIsXAxis ? null : _handleDragStart,
+        // onVerticalDragUpdate: _directionIsXAxis ? null : _handleDragUpdate,
+        // onVerticalDragEnd: _directionIsXAxis ? null : _handleDragEnd,
+        behavior: HitTestBehavior.opaque,
+        child: content,
+        // dragStartBehavior: widget.dragStartBehavior,
+      );
+    } else {
+      return RawGestureDetector(
+        gestures: {
+          VerticalGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<VerticalGestureRecognizer>(
+            () => VerticalGestureRecognizer(),
+            (VerticalGestureRecognizer instance) {
+              instance.onStart = _directionIsXAxis ? null : _handleDragStart;
+              instance.onUpdate = _directionIsXAxis ? null : _handleDragUpdate;
+              instance.onEnd = _directionIsXAxis ? null : _handleDragEnd;
+            },
+          )
+        },
+        // onHorizontalDragStart: _directionIsXAxis ? _handleDragStart : null,
+        // onHorizontalDragUpdate: _directionIsXAxis ? _handleDragUpdate : null,
+        // onHorizontalDragEnd: _directionIsXAxis ? _handleDragEnd : null,
+        // onVerticalDragStart: _directionIsXAxis ? null : _handleDragStart,
+        // onVerticalDragUpdate: _directionIsXAxis ? null : _handleDragUpdate,
+        // onVerticalDragEnd: _directionIsXAxis ? null : _handleDragEnd,
+        behavior: HitTestBehavior.opaque,
+        child: content,
+        // dragStartBehavior: widget.dragStartBehavior,
+      );
+    }
+  }
+}
+
+class HorizontalGestureRecognizer extends HorizontalDragGestureRecognizer {
+  @override
+  void rejectGesture(int pointer) {
+    acceptGesture(pointer);
+  }
+}
+
+class VerticalGestureRecognizer extends VerticalDragGestureRecognizer {
+  @override
+  void rejectGesture(int pointer) {
+    acceptGesture(pointer);
   }
 }

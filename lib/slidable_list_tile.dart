@@ -1,3 +1,4 @@
+import 'package:apollo/splash_view.dart';
 import 'package:flutter/material.dart';
 import 'package:draw/draw.dart';
 import './dismissible.dart';
@@ -93,155 +94,155 @@ class _SlidableListTileState extends State<SlidableListTile> {
 
   @override
   Widget build(BuildContext context) {
-    return DismissibleCustom(
-      background: Container(
-        color: Theme.of(context).backgroundColor,
-        padding: EdgeInsets.symmetric(horizontal: 20),
-        alignment: AlignmentDirectional.center,
-      ),
-      secondaryBackground: Container(
-        color: _getCurrentPullColor(_pastThreshold, offset),
-        padding: EdgeInsets.only(right: 20),
-        // alignment: Alignment((1.2 + offset * 2), 0),
-        alignment: AlignmentDirectional.centerEnd,
-        child: Icon(
-          _getCurrentIcon(),
-          color: Colors.white,
-          size: 25,
+    return Material(
+      color: Theme.of(context).primaryColor,
+      child: SplashView(
+        splashFactory: InkRipple.splashFactory,
+        splashColor:
+            _getCurrentPullColor(_pastThreshold, offset).withOpacity(0.5),
+        background: Container(
+          color: Theme.of(context).backgroundColor,
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          alignment: AlignmentDirectional.center,
         ),
-      ),
-      dismissThresholds: {
-        DismissDirection.endToStart: 0.2,
-        DismissDirection.startToEnd: 1,
-      },
-      onDismissed: (direction, extent) async {
-        double percentage = extent.abs() / MediaQuery.of(context).size.width;
-        if (percentage < 0.4) {
-          _toggleVote();
-        } else {
-          await _toggleSave();
-        }
-      },
-      onMove: (extent) {
-        var beforePullColor = _getCurrentPullColor(_pastThreshold, offset);
-        offset = extent / MediaQuery.of(context).size.width;
-        _pastThreshold = offset.abs() > 0.1;
-        if (beforePullColor != _getCurrentPullColor(_pastThreshold, offset)) {
-          debugPrint("update past threshold");
-          setState(() {});
-        }
-      },
-      movementDuration: Duration(milliseconds: 400),
-      key: Key(widget.post.id),
-      child: Container(
-        padding: EdgeInsets.all(0),
-        child: Material(
-          color: Theme.of(context).primaryColor,
-          // elevation: 2,
-          child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () {
-                if (widget.onTap != null) widget.onTap();
-              },
-              child: Row(
-                children: <Widget>[
-                  (widget.post.thumbnail) == null
-                      ? Icon(Icons.filter)
-                      : Container(
-                          alignment: Alignment.topCenter,
-                          padding: EdgeInsets.all(10),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(5),
-                            child: FadeInImage.memoryNetwork(
-                                placeholder: kTransparentImage,
-                                fadeInDuration: Duration(milliseconds: 500),
-                                image: widget.post.thumbnail.toString(),
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.fitHeight),
+        secondaryBackground: Container(
+          color: _getCurrentPullColor(_pastThreshold, offset),
+          padding: EdgeInsets.only(right: 20),
+          // alignment: Alignment((1.2 + offset * 2), 0),
+          alignment: AlignmentDirectional.centerEnd,
+          child: Icon(
+            _getCurrentIcon(),
+            color: Colors.white,
+            size: 25,
+          ),
+        ),
+        onDismissed: (direction, extent) async {
+          double percentage = extent.abs() / MediaQuery.of(context).size.width;
+          if (percentage < 0.3) {
+            _toggleVote();
+          } else {
+            await _toggleSave();
+          }
+        },
+        onMove: (extent) {
+          var beforePullColor = _getCurrentPullColor(_pastThreshold, offset);
+          offset = extent / MediaQuery.of(context).size.width;
+          _pastThreshold = offset.abs() > 0.1;
+          if (beforePullColor != _getCurrentPullColor(_pastThreshold, offset)) {
+            setState(() {});
+          }
+        },
+        key: Key(widget.post.id),
+        child: Container(
+          padding: EdgeInsets.all(0),
+          child: Material(
+            // elevation: 2,
+            child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  if (widget.onTap != null) widget.onTap();
+                },
+                child: Row(
+                  children: <Widget>[
+                    (widget.post.thumbnail) == null
+                        ? Icon(Icons.filter)
+                        : Container(
+                            alignment: Alignment.topCenter,
+                            padding: EdgeInsets.all(10),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(5),
+                              child: FadeInImage.memoryNetwork(
+                                  placeholder: kTransparentImage,
+                                  fadeInDuration: Duration(milliseconds: 500),
+                                  image: widget.post.thumbnail.toString(),
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.fitHeight),
+                            ),
                           ),
-                        ),
-                  Container(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: <Widget>[
-                        Container(
-                            alignment: Alignment(-1, 0),
-                            child: Text(widget.post.title,
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 13))),
-                        Container(
-                          margin: const EdgeInsets.only(
-                            top: 10,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                          ),
-                          child: Column(
-                            children: <Widget>[
-                              Container(
-                                  alignment: Alignment(-1, 0),
-                                  child: Text(
-                                    widget.post.subreddit.displayName,
-                                    style: TextStyle(
-                                        color: Theme.of(context).accentColor,
-                                        fontSize: 11),
-                                  )),
-                              Row(
-                                children: <Widget>[
-                                  Icon(
-                                    Icons.arrow_upward,
-                                    color: upvoted
-                                        ? Theme.of(context).secondaryHeaderColor
-                                        : Theme.of(context).accentColor,
-                                    size: 15,
-                                  ),
-                                  Spacer(
-                                    flex: 1,
-                                  ),
-                                  Text(
-                                    widget.post.upvotes.toString(),
-                                    style: TextStyle(
+                    Container(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: <Widget>[
+                          Container(
+                              alignment: Alignment(-1, 0),
+                              child: Text(widget.post.title,
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 13))),
+                          Container(
+                            margin: const EdgeInsets.only(
+                              top: 10,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                            ),
+                            child: Column(
+                              children: <Widget>[
+                                Container(
+                                    alignment: Alignment(-1, 0),
+                                    child: Text(
+                                      widget.post.subreddit.displayName,
+                                      style: TextStyle(
+                                          color: Theme.of(context).accentColor,
+                                          fontSize: 11),
+                                    )),
+                                Row(
+                                  children: <Widget>[
+                                    Icon(
+                                      Icons.arrow_upward,
                                       color: upvoted
                                           ? Theme.of(context)
                                               .secondaryHeaderColor
                                           : Theme.of(context).accentColor,
-                                      fontSize: 11,
+                                      size: 15,
                                     ),
-                                  ),
-                                  Spacer(
-                                    flex: 3,
-                                  ),
-                                  Icon(
-                                    Icons.comment,
-                                    color: Theme.of(context).accentColor,
-                                    size: 13,
-                                  ),
-                                  Spacer(
-                                    flex: 1,
-                                  ),
-                                  Text(
-                                    widget.post.numComments.toString(),
-                                    style: TextStyle(
+                                    Spacer(
+                                      flex: 1,
+                                    ),
+                                    Text(
+                                      widget.post.upvotes.toString(),
+                                      style: TextStyle(
+                                        color: upvoted
+                                            ? Theme.of(context)
+                                                .secondaryHeaderColor
+                                            : Theme.of(context).accentColor,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    Spacer(
+                                      flex: 3,
+                                    ),
+                                    Icon(
+                                      Icons.comment,
                                       color: Theme.of(context).accentColor,
-                                      fontSize: 11,
+                                      size: 13,
                                     ),
-                                  ),
-                                  Spacer(
-                                    flex: 20,
-                                  ),
-                                ],
-                              )
-                            ],
+                                    Spacer(
+                                      flex: 1,
+                                    ),
+                                    Text(
+                                      widget.post.numComments.toString(),
+                                      style: TextStyle(
+                                        color: Theme.of(context).accentColor,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    Spacer(
+                                      flex: 20,
+                                    ),
+                                  ],
+                                )
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      // alignment: AlignmentDirectional(-1, 1),
+                      width: 240,
                     ),
-                    // alignment: AlignmentDirectional(-1, 1),
-                    width: 240,
-                  ),
-                ],
-              )),
+                  ],
+                )),
+          ),
         ),
       ),
     );
